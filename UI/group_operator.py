@@ -8,11 +8,15 @@ from ..Nodes.group_nodes import AnimGroupNode, ensure_group_io_nodes
 from ..Core.node_tree import AnimNodeTree
 
 
-def _active_node_space(context):
+def _get_space_node_editor(context):
     space = context.space_data
-    if not space or space.type != 'NODE_EDITOR':
-        return None
-    return space
+    return space if isinstance(space, bpy.types.SpaceNodeEditor) else None
+
+# def _active_node_space(context):
+#     space = context.space_data
+#     if not space or space.type != 'NODE_EDITOR':
+#         return None
+#     return space
 
 
 def _find_node_by_name(tree, name):
@@ -270,59 +274,31 @@ class ANIMGRAPH_OT_enter_group(Operator):
     """Enter AnimGraph group tree and update breadcrumbs."""
     bl_idname = "animgraph.enter_group"
     bl_label = "Enter AnimGraph Group"
-    bl_options = {'REGISTER', 'UNDO'}
+    # bl_options = {'REGISTER', 'UNDO'}
 
-    node_name: StringProperty()
-
-    @classmethod
-    def poll(cls, context):
-        space = _active_node_space(context)
-        if not space:
-            return False
-
-        tree = space.node_tree
-        if not tree or getattr(tree, "bl_idname", None) != AnimNodeTree.bl_idname:
-            return False
-
-        node = context.active_node
-        return bool(node and getattr(node, "node_tree", None))
+    node_name: bpy.props.StringProperty()
 
     def execute(self, context):
-        space = _active_node_space(context)
-        path = space.path
-
-        # Bestimme aktuellen Tree sauber
-        current_tree = path[-1].node_tree if path else space.node_tree
-        if not current_tree:
+        space = _get_space_node_editor(context)
+        if not space:
             return {'CANCELLED'}
 
-        node = _find_node_by_name(current_tree, self.node_name) \
-            if self.node_name else context.active_node
-        if not node:
+        tree = space.edit_tree  # aktuell editierter Tree (readonly)
+        node = tree.nodes.get(self.node_name) if tree else None
+        if not node or not getattr(node, "node_tree", None):
             return {'CANCELLED'}
 
-        child_tree = node.node_tree
-        if not child_tree or getattr(child_tree, "bl_idname", None) != AnimNodeTree.bl_idname:
-            return {'CANCELLED'}
+        subgroup = node.node_tree
 
-        # Rekursion verhindern
-        if _tree_in_path(path, child_tree):
-            self.report({'WARNING'}, "Recursive group entry prevented")
-            return {'CANCELLED'}
+        # Root setzen, falls Path leer ist (oder inkonsistent)
+        if len(space.path) == 0:
+            space.path.start(tree)   # Root = aktueller Tree
 
-        # Root initialisieren
-        if not path:
-            path.append(current_tree)
+        # In die Gruppe navigieren (Breadcrumb erzeugt)
+        space.path.append(subgroup, node=node)
 
-        # IO-Nodes sicherstellen
-        ensure_group_io_nodes(child_tree)
-
-        # Breadcrumb push
-        path.append(child_tree, node=node)
-
-        # Nur setzen, wenn nicht gepinnt
-        if not space.use_pin:
-            space.node_tree = child_tree
+        # Editor auf Subtree schalten
+        space.node_tree = subgroup
 
         return {'FINISHED'}
 
@@ -331,24 +307,20 @@ class ANIMGRAPH_OT_exit_group(Operator):
     """Exit to parent AnimGraph group."""
     bl_idname = "animgraph.exit_group"
     bl_label = "Exit AnimGraph Group"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        space = _active_node_space(context)
-        return bool(space and len(space.path) > 1)
+    # bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        space = _active_node_space(context)
-        path = space.path
-
-        if len(path) <= 1:
+        space = _get_space_node_editor(context)
+        if not space or len(space.path) == 0:
             return {'CANCELLED'}
 
-        path.pop()
+        # Wenn wir nur Root haben: nichts zu poppen
+        if len(space.path) == 1:
+            return {'CANCELLED'}
 
-        parent_tree = path[-1].node_tree
-        if not space.use_pin:
-            space.node_tree = parent_tree
+        space.path.pop()
 
+        # Letzten Tree als aktiven Edit-Tree setzen
+        last = space.path[-1].node_tree
+        space.node_tree = last
         return {'FINISHED'}

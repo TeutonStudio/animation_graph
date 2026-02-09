@@ -37,9 +37,9 @@ def unregister():
 #     # Alles andere bleibt Blender-Standard
 #     _ORIG_CONTEXT_DRAW(self, context)
 
-def update_node(self,n: bpy.types.Node): pass
+def update_node(n: bpy.types.Node): pass
 
-def update_link(self,l: bpy.types.NodeLinks): 
+def update_link(l: bpy.types.NodeLinks): 
     fs = l.from_socket
     ts = l.to_socket
     if not fs or not ts: return
