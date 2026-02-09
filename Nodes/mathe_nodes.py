@@ -7,26 +7,48 @@ from mathutils import Vector, Matrix, Euler
 
 from .Mixin import AnimGraphNodeMixin
 
-number_operators = [
-    ("ADD", "Add", ""),
-    ("SUBTRACT", "Subtract", ""),
-    ("MULTIPLY", "Multiply", ""),
-    ("DIVIDE", "Divide", ""),
-    ("POWER", "Power", ""),
-    ("MINIMUM", "Minimum", ""),
-    ("MAXIMUM", "Maximum", ""),
-]
+class IntConst(Node, AnimGraphNodeMixin):
+    bl_idname = "ANIMGRAPH_IntConst"
+    bl_label = "Constant (Int)"
+    bl_icon = "NODE_SOCKET_INT"
 
-vector_operators = [
-    ("ADD", "Add", ""),
-    ("SUBTRACT", "Subtract", ""),
-    ("MULTIPLY", "Multiply", "Component-wise multiply"),
-    ("DOT", "Scalar product", ""),
-    ("CROSS", "Vector product", ""),
-    ("SCALE", "Scale", "Scale product"),
-    ("LENGTH", "Length", "Returns float length"),
-    ("NORMALIZE", "Normalize", ""),
-]
+    def init(self, context):
+        i = self.outputs.new("NodeSocketInt", "Int")
+    
+    def evaluate(self, tree, scene, ctx): pass
+
+
+class FloatConst(Node, AnimGraphNodeMixin):
+    bl_idname = "ANIMGRAPH_FloatConst"
+    bl_label = "Constant (Float)"
+    bl_icon = "NODE_SOCKET_FLOAT"
+
+    def init(self, context):
+        f = self.outputs.new("NodeSocketFloat", "Float")
+    
+    def evaluate(self, tree, scene, ctx): pass
+
+
+class VectorConst(Node, AnimGraphNodeMixin):
+    bl_idname = "ANIMGRAPH_VectorConst"
+    bl_label = "Constant (Vector)"
+    bl_icon = "EMPTY_AXIS"
+
+    def init(self, context):
+        v = self.outputs.new("NodeSocketVectorXYZ", "Vector")
+    
+    def evaluate(self, tree, scene, ctx): pass
+
+
+class MatrixConst(Node, AnimGraphNodeMixin):
+    bl_idname = "ANIMGRAPH_MatrixConst"
+    bl_label = "Constant (Matrix)"
+    bl_icon = "NODE_SOCKET_MATRIX"
+
+    def init(self, context):
+        m = self.outputs.new("NodeSocketMatrix", "Matrix")
+    
+    def evaluate(self, tree, scene, ctx): pass
 
 
 class IntMath(Node, AnimGraphNodeMixin):
@@ -209,8 +231,7 @@ class CombineXYZ(Node, AnimGraphNodeMixin):
         y = self.socket_float(tree, "Y", scene, ctx, 0.0)
         z = self.socket_float(tree, "Z", scene, ctx, 0.0)
         out = self.outputs.get("Vector")
-        if out:
-            out.default_value = (float(x), float(y), float(z))
+        if out: out.default_value = (float(x), float(y), float(z))
 
 
 class SeparateXYZ(Node, AnimGraphNodeMixin):
@@ -234,6 +255,7 @@ class SeparateXYZ(Node, AnimGraphNodeMixin):
         if oz: oz.default_value = float(v.z)
 
 
+# TODO redefine to MatrixMath
 class MatrixMultiply(Node, AnimGraphNodeMixin):
     bl_idname = "ANIMGRAPH_MatrixMultiply"
     bl_label = "Matrix Multiply"
@@ -310,3 +332,26 @@ class DecomposeMatrix(Node, AnimGraphNodeMixin):
         if ot: ot.default_value = (loc.x, loc.y, loc.z)
         if orot: orot.default_value = (rot_e.x, rot_e.y, rot_e.z)
         if os: os.default_value = (scale.x, scale.y, scale.z)
+
+
+number_operators = [
+    ("ADD", "Add", ""),
+    ("SUBTRACT", "Subtract", ""),
+    ("MULTIPLY", "Multiply", ""),
+    ("DIVIDE", "Divide", ""),
+    ("POWER", "Power", ""),
+    ("MINIMUM", "Minimum", ""),
+    ("MAXIMUM", "Maximum", ""),
+]
+
+vector_operators = [
+    ("ADD", "Add", ""),
+    ("SUBTRACT", "Subtract", ""),
+    ("MULTIPLY", "Multiply", "Component-wise multiply"),
+    ("DOT", "Scalar product", ""),
+    ("CROSS", "Vector product", ""),
+    ("SCALE", "Scale", "Scale product"),
+    ("LENGTH", "Length", "Returns float length"),
+    ("NORMALIZE", "Normalize", ""),
+]
+

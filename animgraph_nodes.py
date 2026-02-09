@@ -5,7 +5,7 @@ from bpy.types import NodeTree, Node, NodeSocket, FunctionNodeIntegerMath
 from bpy.props import FloatProperty, EnumProperty, FloatVectorProperty, StringProperty, PointerProperty
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
 from .Nodes.group_nodes import AnimGroupNode, AnimGroupInputNode, AnimGroupOutputNode
-from .Nodes.mathe_nodes import IntMath, FloatMath, VectorMath, CombineXYZ, SeparateXYZ, MatrixMultiply, ComposeMatrix, DecomposeMatrix
+from .Nodes.mathe_nodes import IntConst, FloatConst, VectorConst, MatrixConst, IntMath, FloatMath, VectorMath, CombineXYZ, SeparateXYZ, MatrixMultiply, ComposeMatrix, DecomposeMatrix
 from .Nodes.bone_node import NodeSocketBone, DefineBoneNode
 from .Nodes.bone_transform_nodes import DefineBoneTransform, ReadBoneTransform
 
@@ -34,10 +34,9 @@ class AnimGraphNodeCategory(NodeCategory):
 _NODE_CATS_ID = "ANIMGRAPH_NODE_CATEGORIES"
 _NODE_CATEGORIES = [
     AnimGraphNodeCategory(
-        "ANIMGRAPH_NODES",
+        "ANIMGRAPH_RIGGRAPH",
         "RigGraph",
         items=[
-#            NodeItem(AnimInput.bl_idname),
             NodeItem(AnimGroupNode.bl_idname),
             NodeItem(AnimGroupInputNode.bl_idname),
             NodeItem(AnimGroupOutputNode.bl_idname),
@@ -46,6 +45,29 @@ _NODE_CATEGORIES = [
             NodeItem(ReadBoneTransform.bl_idname),
         ],
     ),
+
+    AnimGraphNodeCategory(
+        "ANIMGRAPH_INPUT_CONSTANT",
+        "Input: Constant",
+        items=[
+            NodeItem(IntConst.bl_idname),
+            NodeItem(FloatConst.bl_idname),
+            NodeItem(VectorConst.bl_idname),
+            NodeItem(MatrixConst.bl_idname),
+        ],
+    ),
+
+    AnimGraphNodeCategory(
+        "ANIMGRAPH_UTILITY_MATH",
+        "Utility: Math",
+        items=[
+            NodeItem(IntMath.bl_idname),
+            NodeItem(FloatMath.bl_idname),
+            NodeItem(VectorMath.bl_idname),
+            NodeItem(MatrixMultiply.bl_idname),
+        ],
+    ),
+
     AnimGraphNodeCategory(
         "ANIMGRAPH_MATH",
         "Math",
@@ -58,32 +80,22 @@ _NODE_CATEGORIES = [
             NodeItem(MatrixMultiply.bl_idname),
             NodeItem(ComposeMatrix.bl_idname),
             NodeItem(DecomposeMatrix.bl_idname),
-
         ],
     ),
-    # AnimGraphNodeCategory(
-    #     "ANIMGRAPH_MATHE",
-    #     "Mathe",
-    #     items=[
-    #         NodeItem("FunctionNodeIntegerMath"),
-    #     ],
-    # ),
 ]
+
 
 _CLASSES = (
     NodeSocketBone,
     DefineBoneNode,
-    AnimGroupNode, 
+    AnimGroupNode,
     AnimGroupInputNode,
     AnimGroupOutputNode,
     DefineBoneTransform,
     ReadBoneTransform,
-    IntMath,
-    FloatMath,
-    VectorMath,
-    CombineXYZ,
-    SeparateXYZ,
-    MatrixMultiply,
-    ComposeMatrix,
-    DecomposeMatrix,
+
+    IntConst, FloatConst, VectorConst, MatrixConst,
+    IntMath, FloatMath, VectorMath,
+    CombineXYZ, SeparateXYZ,
+    MatrixMultiply, ComposeMatrix, DecomposeMatrix,
 )
