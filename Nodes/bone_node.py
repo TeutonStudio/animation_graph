@@ -1,7 +1,7 @@
 # animation_graph/Nodes/bone_node.py
 
 import bpy
-from ..helpers import AnimGraphNodeMixin
+from .Mixin import AnimGraphNodeMixin
 
 # ---- helpers für die Enums ----
 

@@ -2,11 +2,43 @@
 
 import bpy
 from ..Core.node_tree import AnimNodeTree
-from ..helpers import (
-    AnimGraphNodeMixin,
-    _iter_interface_sockets,
-    _sync_node_sockets,
-)
+from .Mixin import AnimGraphNodeMixin
+
+
+def _sync_node_sockets(sock_list, iface_sockets):
+    try: sock_list.clear()
+    except Exception: return
+
+    for s in iface_sockets:
+        bl_socket_idname = getattr(s, "bl_socket_idname", None)
+        name = getattr(s, "name", None)
+        if bl_socket_idname and name:
+            try: sock_list.new(bl_socket_idname, name)
+            except Exception: pass
+
+def _iter_interface_sockets(ntree, want_in_out=None):
+    """
+    Rekursiv Interface-Sockets aus ntree.interface.items_tree sammeln.
+    want_in_out: "INPUT" | "OUTPUT" | None
+    """
+    iface = getattr(ntree, "interface", None)
+    if iface is None:
+        return []
+
+    def walk(items):
+        for it in items:
+            # In Blender 4/5 sind das i.d.R. NodeTreeInterfaceSocket Items
+            if it.__class__.__name__.endswith("Socket"):
+                if want_in_out is None or getattr(it, "in_out", None) == want_in_out:
+                    yield it
+            child = getattr(it, "items", None)
+            if child:
+                yield from walk(child)
+
+    try:
+        return list(walk(iface.items_tree))
+    except Exception:
+        return []
 
 
 class _GroupNode(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):

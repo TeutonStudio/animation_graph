@@ -1,9 +1,7 @@
 # animation_graph/riggraph_ui.py
 import bpy
 from bpy.types import Panel, Operator
-from bpy.props import PointerProperty
 
-from .helpers import _iter_interface_sockets, _active_armature
 from .Core.node_tree import AnimNodeTree
 from .UI.group_operator import ANIMGRAPH_OT_enter_group, ANIMGRAPH_OT_exit_group, ANIMGRAPH_OT_group_make
 # from .UI.openeditor import ANIMGRAPH_OT_open_in_node_editor
@@ -64,6 +62,12 @@ def unregister():
 #    bpy.utils.unregister_class(RIGGRAPH_OT_make_proxy_action)
 
 #    del bpy.types.Armature.riggraph_tree
+
+def _active_armature(context):
+    ob = context.active_object
+    if ob and ob.type == "ARMATURE":
+        return ob.data
+    return None
 
 
 class DATA_PT_riggraph(Panel):
@@ -216,109 +220,109 @@ def _resync_group_system_for_tree(tree):
         pass
 
 
-class RIGGRAPH_OT_interface_add_socket(bpy.types.Operator):
-    bl_idname = "riggraph.interface_add_socket"
-    bl_label = "Add Group Socket"
-    bl_options = {"REGISTER", "UNDO"}
+# class RIGGRAPH_OT_interface_add_socket(bpy.types.Operator):
+#     bl_idname = "riggraph.interface_add_socket"
+#     bl_label = "Add Group Socket"
+#     bl_options = {"REGISTER", "UNDO"}
 
-    in_out: bpy.props.EnumProperty(
-        name="Direction",
-        items=[("INPUT", "Input", ""), ("OUTPUT", "Output", "")],
-        default="INPUT",
-    )
-    socket_type: bpy.props.EnumProperty(
-        name="Socket Type",
-        items=_interface_socket_types(),
-        default="NodeSocketFloat",
-    )
-    name: bpy.props.StringProperty(name="Name", default="Value")
+#     in_out: bpy.props.EnumProperty(
+#         name="Direction",
+#         items=[("INPUT", "Input", ""), ("OUTPUT", "Output", "")],
+#         default="INPUT",
+#     )
+#     socket_type: bpy.props.EnumProperty(
+#         name="Socket Type",
+#         items=_interface_socket_types(),
+#         default="NodeSocketFloat",
+#     )
+#     name: bpy.props.StringProperty(name="Name", default="Value")
 
-    @classmethod
-    def poll(cls, context):
-        tree = _active_animgraph_tree(context)
-        return bool(tree and getattr(tree, "interface", None))
+#     @classmethod
+#     def poll(cls, context):
+#         tree = _active_animgraph_tree(context)
+#         return bool(tree and getattr(tree, "interface", None))
 
-    def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
+#     def invoke(self, context, event):
+#         return context.window_manager.invoke_props_dialog(self)
 
-    def execute(self, context):
-        tree = _active_animgraph_tree(context)
-        if not tree:
-            return {"CANCELLED"}
+#     def execute(self, context):
+#         tree = _active_animgraph_tree(context)
+#         if not tree:
+#             return {"CANCELLED"}
 
-        iface = getattr(tree, "interface", None)
-        if iface is None:
-            self.report({"WARNING"}, "Tree has no interface (Blender API mismatch?)")
-            return {"CANCELLED"}
+#         iface = getattr(tree, "interface", None)
+#         if iface is None:
+#             self.report({"WARNING"}, "Tree has no interface (Blender API mismatch?)")
+#             return {"CANCELLED"}
 
-        base = (self.name or "").strip() or "Value"
-        existing = {getattr(s, "name", "") for s in _iter_interface_sockets(tree)}
-        name = base
-        i = 2
-        while name in existing:
-            name = f"{base}.{i:03d}"
-            i += 1
+#         base = (self.name or "").strip() or "Value"
+#         existing = {getattr(s, "name", "") for s in _iter_interface_sockets(tree)}
+#         name = base
+#         i = 2
+#         while name in existing:
+#             name = f"{base}.{i:03d}"
+#             i += 1
 
-        try:
-            iface.new_socket(name=name, in_out=self.in_out, socket_type=self.socket_type)
-        except TypeError:
-            # some builds use bl_socket_idname instead of socket_type
-            iface.new_socket(name=name, in_out=self.in_out, bl_socket_idname=self.socket_type)
+#         try:
+#             iface.new_socket(name=name, in_out=self.in_out, socket_type=self.socket_type)
+#         except TypeError:
+#             # some builds use bl_socket_idname instead of socket_type
+#             iface.new_socket(name=name, in_out=self.in_out, bl_socket_idname=self.socket_type)
 
-        _resync_group_system_for_tree(tree)
-        return {"FINISHED"}
+#         _resync_group_system_for_tree(tree)
+#         return {"FINISHED"}
 
 
-class RIGGRAPH_OT_interface_remove_socket(bpy.types.Operator):
-    bl_idname = "riggraph.interface_remove_socket"
-    bl_label = "Remove Group Socket"
-    bl_options = {"REGISTER", "UNDO"}
+# class RIGGRAPH_OT_interface_remove_socket(bpy.types.Operator):
+#     bl_idname = "riggraph.interface_remove_socket"
+#     bl_label = "Remove Group Socket"
+#     bl_options = {"REGISTER", "UNDO"}
 
-    in_out: bpy.props.EnumProperty(
-        name="Direction",
-        items=[("INPUT", "Input", ""), ("OUTPUT", "Output", "")],
-        default="INPUT",
-    )
-    name: bpy.props.StringProperty(
-        name="Name",
-        default="Value",
-        description="Exact socket name to remove (MVP).",
-    )
+#     in_out: bpy.props.EnumProperty(
+#         name="Direction",
+#         items=[("INPUT", "Input", ""), ("OUTPUT", "Output", "")],
+#         default="INPUT",
+#     )
+#     name: bpy.props.StringProperty(
+#         name="Name",
+#         default="Value",
+#         description="Exact socket name to remove (MVP).",
+#     )
 
-    @classmethod
-    def poll(cls, context):
-        tree = _active_animgraph_tree(context)
-        return bool(tree and getattr(tree, "interface", None))
+#     @classmethod
+#     def poll(cls, context):
+#         tree = _active_animgraph_tree(context)
+#         return bool(tree and getattr(tree, "interface", None))
 
-    def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
+#     def invoke(self, context, event):
+#         return context.window_manager.invoke_props_dialog(self)
 
-    def execute(self, context):
-        tree = _active_animgraph_tree(context)
-        if not tree:
-            return {"CANCELLED"}
+#     def execute(self, context):
+#         tree = _active_animgraph_tree(context)
+#         if not tree:
+#             return {"CANCELLED"}
 
-        iface = getattr(tree, "interface", None)
-        if iface is None:
-            return {"CANCELLED"}
+#         iface = getattr(tree, "interface", None)
+#         if iface is None:
+#             return {"CANCELLED"}
 
-        target = None
-        for s in _iter_interface_sockets(tree, want_in_out=self.in_out):
-            if getattr(s, "name", None) == self.name:
-                target = s
-                break
+#         target = None
+#         for s in _iter_interface_sockets(tree, want_in_out=self.in_out):
+#             if getattr(s, "name", None) == self.name:
+#                 target = s
+#                 break
 
-        if target is None:
-            self.report({"WARNING"}, f"No {self.in_out} socket named '{self.name}'")
-            return {"CANCELLED"}
+#         if target is None:
+#             self.report({"WARNING"}, f"No {self.in_out} socket named '{self.name}'")
+#             return {"CANCELLED"}
 
-        try:
-            iface.remove(target)
-        except Exception:
-            iface.items_tree.remove(target)
+#         try:
+#             iface.remove(target)
+#         except Exception:
+#             iface.items_tree.remove(target)
 
-        _resync_group_system_for_tree(tree)
-        return {"FINISHED"}
+#         _resync_group_system_for_tree(tree)
+#         return {"FINISHED"}
 
 # class RIGGRAPH_OT_path_pop_to(bpy.types.Operator):
 #     bl_idname = "riggraph.path_pop_to"
