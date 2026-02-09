@@ -15,7 +15,14 @@ def update_link(l: bpy.types.NodeLink):
     def invalidLink(str,von = fs,nach = ts): return von.bl_idname == str and von.bl_idname != nach.bl_idname
     # Erlaubt ist NUR Bone -> Bone
     invalidBone = invalidLink("NodeSocketBone")
-    if invalidBone:
+    invalidInt = invalidLink("NodeSocketInt")
+    invalidFloat = invalidLink("NodeSocketFloat")
+    invalidVector = invalidLink("NodeSocketVectorXYZ")
+    invalidRotation = invalidLink("NodeSocketRotation")
+    invalidTranslation = invalidLink("NodeSocketTranslation")
+    invalidMatrix = invalidLink("NodeSocketMatrix")
+    invalid = invalidBone or invalidInt or invalidFloat or invalidVector or invalidRotation or invalidTranslation or invalidMatrix
+    if invalid:
         try: self.links.remove(l)
         except RuntimeError: pass
 
