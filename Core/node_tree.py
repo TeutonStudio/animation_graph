@@ -59,6 +59,7 @@ class AnimNodeTree(NodeTree):
     bl_idname = "ANIMGRAPH_Tree"
     bl_label = "Animation Node Editor"
     bl_icon = "ARMATURE_DATA"
+    bl_use_group_interface = True
 #    bl_description = "Wird verwendet um eine Amatur Pose abhängig vom Zeitpunkt zu definieren"
 
     # rig_object: PointerProperty(

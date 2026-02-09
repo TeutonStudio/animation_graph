@@ -464,6 +464,11 @@ def _on_depsgraph_update(scene, depsgraph):
     if _RUNNING:
         return
 
+    for area in bpy.context.screen.areas:
+        if area.type == 'NODE_EDITOR':
+            space = area.spaces.active
+            if space.edit_tree and space.edit_tree.bl_idname == "ANIMGRAPH_Tree":
+                space.overlay.show_context_path = True
     for tree in _iter_animtrees():
         if getattr(tree, "dirty", False):
             tree.dirty = False

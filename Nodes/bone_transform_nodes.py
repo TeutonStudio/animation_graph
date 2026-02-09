@@ -46,9 +46,10 @@ class _BoneTransform(Node,AnimGraphNodeMixin):
         s = self.inputs.new("NodeSocketInt", "Start")
         d = self.inputs.new("NodeSocketInt", "Duration")
         try:
-            s.default_value = 0.0
-            d.default_value = 10.0
+            s.default_value = 0
+            d.default_value = 10
         except Exception: pass
+
     def draw_buttons(self, context, layout): 
         col = layout.column(align=True)
         col.prop(self, "representation", text="")
@@ -85,6 +86,7 @@ class DefineBoneTransform(_BoneTransform):
     def update_mode(self,context): self.update()
 
     def init(self, context):
+        super().init(context)
         # Components inputs
         p = self.inputs.new("NodeSocketVector", "Position")
         r = self.inputs.new("NodeSocketVector", "Rotation")
@@ -114,12 +116,13 @@ class DefineBoneTransform(_BoneTransform):
         self._update_transform_socket({s.name: s for s in getattr(self, "inputs", [])})
 
     def draw_buttons(self, context, layout):
+        super().draw_buttons(context,layout)
         layout.separator()
         col = layout.column(align=True)
         col.prop(self, "interpolation")
         col.prop(self, "easing")
 
-class ReadBoneTransform(Node, AnimGraphNodeMixin):
+class ReadBoneTransform(_BoneTransform):
     bl_idname = "ANIMGRAPH_ReadBoneTransform"
     bl_label = "Bone Transform"
 
@@ -127,6 +130,7 @@ class ReadBoneTransform(Node, AnimGraphNodeMixin):
     def update_mode(self,context): pass
 
     def init(self, context):
+        super().init(context)
         # Outputs
         self.outputs.new("NodeSocketVector", "Position")
         self.outputs.new("NodeSocketVector", "Rotation")
@@ -144,4 +148,4 @@ class ReadBoneTransform(Node, AnimGraphNodeMixin):
         use_delta = (getattr(self, "apply_mode", "TO") == "DELTA")
         if "End" in ins: ins["End"].hide = not use_delta
 
-    def draw_buttons(self, context, layout): pass
+    # def draw_buttons(self, context, layout): passs
