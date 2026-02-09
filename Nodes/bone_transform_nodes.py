@@ -66,6 +66,32 @@ def _mix_rotation(state, rot_target, f):
         (1.0 - f) * sr.z + f * tr.z,
     ), sr.order)
 
+def _on_node_prop_update(self, context):
+    try:
+        self.update()
+    except Exception:
+        pass
+
+    try:
+        nt = getattr(self, "id_data", None)
+        if nt:
+            nt.update_tag()
+            # some node trees need this to refresh socket UI properly
+            if hasattr(nt, "interface_update"):
+                nt.interface_update(context)
+    except Exception:
+        pass
+
+    # force redraw of node editor areas
+    try:
+        if context and context.window and context.window.screen:
+            for area in context.window.screen.areas:
+                if area.type == "NODE_EDITOR":
+                    area.tag_redraw()
+    except Exception:
+        pass
+
+
 
 # -----------------------------
 # nodes
@@ -84,6 +110,7 @@ class _BoneTransform(Node, AnimGraphNodeMixin):
             ("MATRIX", "Matrix", "Output Matrix"),
         ],
         default="COMPONENTS",
+        update=_on_node_prop_update,
     )
 
     apply_mode: EnumProperty(
@@ -93,6 +120,7 @@ class _BoneTransform(Node, AnimGraphNodeMixin):
             ("DELTA", "Delta", "Use delta relative to start"),
         ],
         default="TO",
+        update=_on_node_prop_update,
     )
 
     def update_representation(self, context):  # overridden
