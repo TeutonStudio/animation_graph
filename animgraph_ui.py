@@ -13,10 +13,10 @@ from .UI.group_operator import ANIMGRAPH_OT_enter_group, ANIMGRAPH_OT_exit_group
 
 #addon_keymaps = []
 
-def register(): 
-    bpy.utils.register_class(ANIMGRAPH_OT_enter_group)
-    bpy.utils.register_class(ANIMGRAPH_OT_exit_group)
-    bpy.utils.register_class(ANIMGRAPH_OT_group_make)
+def register(): pass
+    # bpy.utils.register_class(ANIMGRAPH_OT_enter_group)
+    # bpy.utils.register_class(ANIMGRAPH_OT_exit_group)
+    # bpy.utils.register_class(ANIMGRAPH_OT_group_make)
 #    bpy.types.NODE_HT_header.prepend(riggraph_draw_breadcrumb_blender_like)
 #    bpy.types.Armature.riggraph_tree = PointerProperty(
 #        name="Animation Node Editor",
@@ -40,10 +40,10 @@ def register():
 #    bpy.utils.register_class(DATA_PT_riggraph)
 #    bpy.utils.register_class(RIGGRAPH_OT_make_proxy_action)
 
-def unregister(): 
-    bpy.utils.unregister_class(ANIMGRAPH_OT_enter_group)
-    bpy.utils.unregister_class(ANIMGRAPH_OT_exit_group)
-    bpy.utils.unregister_class(ANIMGRAPH_OT_group_make)
+def unregister(): pass
+    # bpy.utils.unregister_class(ANIMGRAPH_OT_enter_group)
+    # bpy.utils.unregister_class(ANIMGRAPH_OT_exit_group)
+    # bpy.utils.unregister_class(ANIMGRAPH_OT_group_make)
 #    bpy.types.NODE_HT_header.remove(riggraph_draw_breadcrumb_blender_like)
 #    kc = bpy.context.window_manager.keyconfigs.addon
 #    if kc:

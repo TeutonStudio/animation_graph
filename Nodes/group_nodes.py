@@ -1,9 +1,6 @@
 # animation_graph/Nodes/group_nodes.py
 
 import bpy
-from bpy.types import NodeCustomGroup
-from bpy.props import PointerProperty
-
 from ..Core.node_tree import AnimNodeTree
 from ..helpers import (
     AnimGraphNodeMixin,
@@ -12,7 +9,7 @@ from ..helpers import (
 )
 
 
-class _GroupNode(NodeCustomGroup, AnimGraphNodeMixin):
+class _GroupNode(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
     @classmethod
     def poll(cls, ntree): return getattr(ntree, "bl_idname", None) == AnimNodeTree.bl_idname
 
