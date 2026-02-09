@@ -1,0 +1,12 @@
+schema_version = "1.0.0"
+
+id = "animgraph"
+version = "0.1.0"
+name = "AnimationGraph"
+tagline = "Armature-only node graph for animation composition"
+maintainer = "You <you@example.com>"
+type = "add-on"
+
+blender_version_min = "5.0.0"
+license = ["SPDX:GPL-3.0-or-later"]
+
