@@ -1,10 +1,10 @@
 schema_version = "1.0.0"
 
 id = "animgraph"
-version = "0.1.0"
+version = "0.1.2"
 name = "AnimationGraph"
 tagline = "Armature-only node graph for animation composition"
-maintainer = "You <you@example.com>"
+maintainer = "<TeutonStudios@proton.me>"
 type = "add-on"
 
 blender_version_min = "5.0.0"
