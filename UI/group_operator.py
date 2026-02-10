@@ -7,6 +7,18 @@ from bpy.props import StringProperty
 from ..Nodes.group_nodes import AnimGroupNode, ensure_group_io_nodes
 from ..Core.node_tree import AnimNodeTree
 
+_CLASSES = [
+    ANIMGRAPH_OT_enter_group,
+    ANIMGRAPH_OT_exit_group,
+    # ANIMGRAPH_OT_group_make,
+]
+
+def register():
+    for c in _CLASSES: bpy.utils.register_class(c)
+
+def unregister():
+    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
+
 
 def _get_space_node_editor(context):
     space = context.space_data
