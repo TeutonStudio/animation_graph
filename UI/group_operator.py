@@ -12,12 +12,6 @@ def _get_space_node_editor(context):
     space = context.space_data
     return space if isinstance(space, bpy.types.SpaceNodeEditor) else None
 
-# def _active_node_space(context):
-#     space = context.space_data
-#     if not space or space.type != 'NODE_EDITOR':
-#         return None
-#     return space
-
 
 def _find_node_by_name(tree, name):
     if not tree or not name:

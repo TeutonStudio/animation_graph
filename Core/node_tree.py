@@ -13,18 +13,23 @@ def update_link(l: bpy.types.NodeLink):
     if not fs or not ts: return
 
     def invalidLink(str,von = fs,nach = ts): return von.bl_idname == str and von.bl_idname != nach.bl_idname
-    # Erlaubt ist NUR Bone -> Bone
-    invalidBone = invalidLink("NodeSocketBone")
-    invalidInt = invalidLink("NodeSocketInt")
-    invalidFloat = invalidLink("NodeSocketFloat")
-    invalidVector = invalidLink("NodeSocketVectorXYZ")
-    invalidRotation = invalidLink("NodeSocketRotation")
-    invalidTranslation = invalidLink("NodeSocketTranslation")
-    invalidMatrix = invalidLink("NodeSocketMatrix")
-    invalid = invalidBone or invalidInt or invalidFloat or invalidVector or invalidRotation or invalidTranslation or invalidMatrix
+
+    invalid = (
+        invalidLink("NodeSocketBone") or
+        invalidLink("NodeSocketInt") or
+        invalidLink("NodeSocketFloat") or
+        invalidLink("NodeSocketVectorXYZ") or
+        invalidLink("NodeSocketRotation") or
+        invalidLink("NodeSocketTranslation") or
+        invalidLink("NodeSocketMatrix")
+    )
+
     if invalid:
-        try: self.links.remove(l)
-        except RuntimeError: pass
+        try:
+            # tree muss rein, sonst gibt's kein self
+            (tree or l.id_data).links.remove(l)
+        except RuntimeError:
+            pass
 
 class AnimNodeTree(bpy.types.NodeTree):
     """AnimGraph node tree."""
