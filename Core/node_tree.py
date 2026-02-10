@@ -5,32 +5,6 @@ import bpy
 def register(): bpy.utils.register_class(AnimNodeTree)
 def unregister(): bpy.utils.unregister_class(AnimNodeTree)
 
-def update_node(n: bpy.types.Node): pass
-
-def update_link(l: bpy.types.NodeLink): 
-    fs = l.from_socket
-    ts = l.to_socket
-    if not fs or not ts: return
-
-    def invalidLink(str,von = fs,nach = ts): return von.bl_idname == str and von.bl_idname != nach.bl_idname
-
-    invalid = (
-        invalidLink("NodeSocketBone") or
-        invalidLink("NodeSocketInt") or
-        invalidLink("NodeSocketFloat") or
-        invalidLink("NodeSocketVectorXYZ") or
-        invalidLink("NodeSocketRotation") or
-        invalidLink("NodeSocketTranslation") or
-        invalidLink("NodeSocketMatrix")
-    )
-
-    if invalid:
-        try:
-            # tree muss rein, sonst gibt's kein self
-            (tree or l.id_data).links.remove(l)
-        except RuntimeError:
-            pass
-
 class AnimNodeTree(bpy.types.NodeTree):
     """AnimGraph node tree."""
 
@@ -52,5 +26,32 @@ class AnimNodeTree(bpy.types.NodeTree):
         self.dirty = True
 
         # RigInput Node-Ausgänge aktualisieren (optional)
-        for n in getattr(self, "nodes", []): update_node(n)
-        for l in getattr(self, "links", []): update_link(l)
+        for n in getattr(self, "nodes", []): self.update_node(n)
+        for l in getattr(self, "links", []): self.update_link(l)
+
+    def update_node(self,n: bpy.types.Node): pass
+
+    def update_link(self,l: bpy.types.NodeLink): 
+        fs = l.from_socket
+        ts = l.to_socket
+        if not fs or not ts: return
+
+        def invalidLink(str,von = fs,nach = ts): return von.bl_idname == str and von.bl_idname != nach.bl_idname
+
+        invalid = (
+            invalidLink("NodeSocketBone") or
+            invalidLink("NodeSocketInt") or
+            invalidLink("NodeSocketFloat") or
+            invalidLink("NodeSocketVectorXYZ") or
+            invalidLink("NodeSocketRotation") or
+            invalidLink("NodeSocketTranslation") or
+            invalidLink("NodeSocketMatrix") or
+            False
+        )
+
+        if invalid:
+            try:
+                # tree muss rein, sonst gibt's kein self
+                self.links.remove(l)
+            except RuntimeError:
+                pass

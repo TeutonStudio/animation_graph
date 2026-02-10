@@ -1,22 +1,24 @@
 #animation_graph/UI/interface_manage.py
-
 import bpy
 from ..Core.node_tree import AnimNodeTree
 from ..Nodes.group_nodes import _iter_interface_sockets
 
 _iface_cache = {}
+_timer_running = False
 
 def register():
-    if _depsgraph_post not in bpy.app.handlers.depsgraph_update_post:
-        bpy.app.handlers.depsgraph_update_post.append(_depsgraph_post)
+    global _timer_running
+    if not _timer_running:
+        _timer_running = True
+        bpy.app.timers.register(_timer_tick, persistent=True)
 
 def unregister():
-    if _depsgraph_post in bpy.app.handlers.depsgraph_update_post:
-        bpy.app.handlers.depsgraph_update_post.remove(_depsgraph_post)
+    global _timer_running
+    _timer_running = False
     _iface_cache.clear()
+    # Timer deregistriert sich selbst, weil _timer_tick None zurückgibt.
 
 def _iface_signature(tree: bpy.types.NodeTree):
-    """Erzeuge eine stabile Signatur der Interface-Sockets (Input+Output)."""
     ins = _iter_interface_sockets(tree, want_in_out="INPUT")
     outs = _iter_interface_sockets(tree, want_in_out="OUTPUT")
 
@@ -27,13 +29,10 @@ def _iface_signature(tree: bpy.types.NodeTree):
             getattr(s, "bl_socket_idname", None),
             getattr(s, "name", None),
         )
-
     return tuple(pack(s) for s in ins + outs)
 
 def _sync_tree_nodes(tree: bpy.types.NodeTree):
-    """Sync GroupInput/GroupOutput innerhalb des Subtrees."""
     for n in getattr(tree, "nodes", []):
-        # Deine Node-Klassen: AnimGroupInputNode / AnimGroupOutputNode
         if getattr(n, "bl_idname", "") in {"ANIMGRAPH_GroupInput", "ANIMGRAPH_GroupOutput"}:
             try:
                 n.sync_from_tree_interface()
@@ -41,7 +40,6 @@ def _sync_tree_nodes(tree: bpy.types.NodeTree):
                 pass
 
 def _sync_group_instances_referencing(subtree: bpy.types.NodeTree):
-    """Sync alle Group-Instanzen in allen AnimNodeTrees, die subtree referenzieren."""
     for host in bpy.data.node_groups:
         if getattr(host, "bl_idname", None) != AnimNodeTree.bl_idname:
             continue
@@ -52,8 +50,13 @@ def _sync_group_instances_referencing(subtree: bpy.types.NodeTree):
                 except Exception:
                     pass
 
-def _depsgraph_post(scene, depsgraph):
-    # Prüfe alle AnimNodeTrees (deine Gruppen leben dort)
+def _timer_tick():
+    global _timer_running
+    if not _timer_running:
+        return None  # stop timer
+
+    changed_any = False
+
     for tree in bpy.data.node_groups:
         if getattr(tree, "bl_idname", None) != AnimNodeTree.bl_idname:
             continue
@@ -63,15 +66,21 @@ def _depsgraph_post(scene, depsgraph):
 
         if _iface_cache.get(key) != sig:
             _iface_cache[key] = sig
+            changed_any = True
 
-            # 1) IO Nodes im Tree selbst aktualisieren
             _sync_tree_nodes(tree)
-
-            # 2) Instanz-Nodes in anderen Trees aktualisieren
             _sync_group_instances_referencing(tree)
 
-            # Optional: Blender “anstoßen”, UI/Depsgraph zu refreshen
             try:
                 tree.update_tag()
             except Exception:
                 pass
+
+    # UI redraw anstoßen (sonst siehst du es manchmal erst nach Klickerei)
+    if changed_any:
+        for win in bpy.context.window_manager.windows:
+            for area in win.screen.areas:
+                if area.type == "NODE_EDITOR":
+                    area.tag_redraw()
+
+    return 0.25  # alle 250ms prüfen

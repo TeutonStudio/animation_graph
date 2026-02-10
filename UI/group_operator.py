@@ -7,12 +7,6 @@ from bpy.props import StringProperty
 from ..Nodes.group_nodes import AnimGroupNode, ensure_group_io_nodes
 from ..Core.node_tree import AnimNodeTree
 
-_CLASSES = [
-    ANIMGRAPH_OT_enter_group,
-    ANIMGRAPH_OT_exit_group,
-    # ANIMGRAPH_OT_group_make,
-]
-
 def register():
     for c in _CLASSES: bpy.utils.register_class(c)
 
@@ -330,3 +324,9 @@ class ANIMGRAPH_OT_exit_group(Operator):
         last = space.path[-1].node_tree
         space.node_tree = last
         return {'FINISHED'}
+
+_CLASSES = [
+    ANIMGRAPH_OT_enter_group,
+    ANIMGRAPH_OT_exit_group,
+    # ANIMGRAPH_OT_group_make,
+]

@@ -1,8 +1,8 @@
 # animation_graph/Nodes/group_nodes.py
 
 import bpy
-from ..Core.node_tree import AnimNodeTree
 from .Mixin import AnimGraphNodeMixin
+from ..Core.node_tree import AnimNodeTree
 
 
 def _sync_node_sockets(sock_list, iface_sockets):
@@ -110,11 +110,12 @@ class _GroupSocketNode(_GroupNode):
             return
 
         iface_sockets = _iter_interface_sockets(tree, want_in_out=self.socket_1)
-        if not iface_sockets:
-            return
 
         target_list = self.outputs if self.socket_2 == "OUTPUTS" else self.inputs
+
+        # WICHTIG: auch bei leer -> clear
         _sync_node_sockets(target_list, iface_sockets)
+
 
 
 class AnimGroupInputNode(_GroupSocketNode):
