@@ -364,7 +364,7 @@ class ReadBoneTransform(_BoneTransform):
         super().init(context)
 
         # Optional "End" input for DELTA UI (kept, even if we don't frame-sample).
-        self.inputs.new("NodeSocketInt", "End")
+        # self.inputs.new("NodeSocketInt", "End")
 
         # Outputs
         self.outputs.new("NodeSocketVectorTranslation", "Translation")
@@ -382,8 +382,8 @@ class ReadBoneTransform(_BoneTransform):
         self._update_transform_socket(outs)
 
         use_delta = (getattr(self, "apply_mode", "TO") == "DELTA")
-        if "End" in ins:
-            ins["End"].hide = not use_delta
+        if "Duration" in ins:
+            ins["Duration"].hide = not use_delta
 
     def evaluate(self, tree, scene, ctx):
         arm_ob, bone_name = self.socket_bone_ref("Bone")
