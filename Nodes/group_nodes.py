@@ -6,30 +6,55 @@ from ..Core.node_tree import AnimNodeTree
 
 
 def _sync_node_sockets(sock_list, iface_sockets):
-    try: sock_list.clear()
-    except Exception: return
-
+    want = []
     for s in iface_sockets:
-        bl_socket_idname = getattr(s, "bl_idname", None)
-        name = getattr(s, "name", None)
-        if bl_socket_idname and name:
-            try: sock_list.new(bl_socket_idname, name)
-            except Exception: pass
+        socket_type = getattr(s, "socket_type", None) or getattr(s, "bl_socket_idname", None)
+        ident = getattr(s, "identifier", None) or getattr(s, "name", None)
+        name  = getattr(s, "name", None)
+        if socket_type and ident and name:
+            want.append((ident, socket_type, name))
+
+    # existing by name (NodeSocket identifier ist nicht sauber setzbar, daher meist über name matchen)
+    existing = {sock.name: sock for sock in sock_list}
+
+    # remove sockets not wanted (by name)
+    want_names = {name for (_, _, name) in want}
+    for sock in list(sock_list):
+        if sock.name not in want_names:
+            try:
+                sock_list.remove(sock)
+            except Exception:
+                pass
+
+    # add missing + ensure type
+    existing = {sock.name: sock for sock in sock_list}
+    for ident, socket_type, name in want:
+        sock = existing.get(name)
+        if sock is None:
+            try:
+                sock_list.new(socket_type, name)
+            except Exception:
+                pass
+        else:
+            # wenn Typ nicht passt: neu erzeugen
+            if getattr(sock, "bl_idname", None) != socket_type:
+                try:
+                    sock_list.remove(sock)
+                    sock_list.new(socket_type, name)
+                except Exception:
+                    pass
+
 
 def _iter_interface_sockets(ntree, want_in_out=None):
-    """
-    Rekursiv Interface-Sockets aus ntree.interface.items_tree sammeln.
-    want_in_out: "INPUT" | "OUTPUT" | None
-    """
     iface = getattr(ntree, "interface", None)
     if iface is None:
         return []
 
     def walk(items):
         for it in items:
-            # In Blender 4/5 sind das i.d.R. NodeTreeInterfaceSocket Items
-            if it.__class__.__name__.endswith("Socket"):
-                if want_in_out is None or getattr(it, "in_out", None) == want_in_out:
+            # Interface sockets haben in_out + socket_type
+            if hasattr(it, "in_out") and hasattr(it, "socket_type"):
+                if want_in_out is None or it.in_out == want_in_out:
                     yield it
             child = getattr(it, "items", None)
             if child:
@@ -39,6 +64,7 @@ def _iter_interface_sockets(ntree, want_in_out=None):
         return list(walk(iface.items_tree))
     except Exception:
         return []
+
 
 
 class _GroupNode(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
