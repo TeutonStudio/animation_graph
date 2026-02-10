@@ -5,6 +5,41 @@ import bpy
 def register(): bpy.utils.register_class(AnimNodeTree)
 def unregister(): bpy.utils.unregister_class(AnimNodeTree)
 
+validLinks = {
+    "NodeSocketBone":[
+        "NodeSocketBone"
+    ],
+    "NodeSocketInt":[
+        "NodeSocketInt"
+    ],
+    "NodeSocketFloat":[
+        "NodeSocketFloat",
+        "NodeSocketInt",
+    ],
+    "NodeSocketVectorXYZ":[
+        "NodeSocketVectorXYZ",
+        "NodeSocketVector",
+    ],
+    "NodeSocketRotation":[
+        "NodeSocketRotation",
+        "NodeSocketVector",
+    ],
+    "NodeSocketVectorTranslation":[
+        "NodeSocketVectorTranslation",
+        "NodeSocketVector",
+    ],
+    "NodeSocketVector":[
+        "NodeSocketVector",
+        "NodeSocketVectorXYZ",
+        "NodeSocketRotation",
+        "NodeSocketVectorTranslation",
+    ],
+    "NodeSocketMatrix":[
+        "NodeSocketMatrix",
+    ],
+
+}
+
 class AnimNodeTree(bpy.types.NodeTree):
     """AnimGraph node tree."""
 
@@ -36,22 +71,21 @@ class AnimNodeTree(bpy.types.NodeTree):
         ts = l.to_socket
         if not fs or not ts: return
 
-        def invalidLink(str,von = fs,nach = ts): return von.bl_idname == str and von.bl_idname != nach.bl_idname
-
-        invalid = (
-            invalidLink("NodeSocketBone") or
-            invalidLink("NodeSocketInt") or
-            invalidLink("NodeSocketFloat") or
-            invalidLink("NodeSocketVectorXYZ") or
-            invalidLink("NodeSocketRotation") or
-            invalidLink("NodeSocketTranslation") or
-            invalidLink("NodeSocketMatrix") or
+        def validLink(str, von = fs,nach = ts):
+            if von.bl_idname == nach.bl_idname: return True
+            return von.bl_idname == str and nach.bl_idname in validLinks[str]
+        valid = (
+            validLink("NodeSocketBone") or
+            validLink("NodeSocketInt") or
+            validLink("NodeSocketFloat") or
+            validLink("NodeSocketVectorXYZ") or
+            validLink("NodeSocketRotation") or
+            validLink("NodeSocketVectorTranslation") or
+            validLink("NodeSocketVector") or
+            validLink("NodeSocketMatrix") or
             False
         )
 
-        if invalid:
-            try:
-                # tree muss rein, sonst gibt's kein self
-                self.links.remove(l)
-            except RuntimeError:
-                pass
+        if not valid:
+            try: self.links.remove(l)
+            except RuntimeError: pass

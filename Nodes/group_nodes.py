@@ -10,7 +10,7 @@ def _sync_node_sockets(sock_list, iface_sockets):
     except Exception: return
 
     for s in iface_sockets:
-        bl_socket_idname = getattr(s, "bl_socket_idname", None)
+        bl_socket_idname = getattr(s, "bl_idname", None)
         name = getattr(s, "name", None)
         if bl_socket_idname and name:
             try: sock_list.new(bl_socket_idname, name)
