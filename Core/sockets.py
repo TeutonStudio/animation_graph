@@ -3,7 +3,6 @@
 import bpy
 
 
-
 class NodeSocketBone(bpy.types.NodeSocket):
     bl_idname = "NodeSocketBone"
     bl_label = "Bone"

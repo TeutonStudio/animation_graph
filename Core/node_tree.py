@@ -1,7 +1,6 @@
 # animation_graph/Core/node_tree.py
 
 import bpy
-from ..Nodes.group_nodes import AnimGroupNode, AnimGroupInputNode, AnimGroupOutputNode
 from . import sockets
 
 def register(): bpy.utils.register_class(AnimNodeTree)

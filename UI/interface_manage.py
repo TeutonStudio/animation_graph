@@ -26,10 +26,12 @@ def _iface_signature(tree: bpy.types.NodeTree):
         return (
             getattr(s, "in_out", None),
             getattr(s, "identifier", None) or getattr(s, "name", ""),
-            getattr(s, "bl_socket_idname", None),
+            # HIER: socket_type, nicht bl_socket_idname
+            getattr(s, "socket_type", None) or getattr(s, "bl_socket_idname", None),
             getattr(s, "name", None),
         )
     return tuple(pack(s) for s in ins + outs)
+
 
 def _sync_tree_nodes(tree: bpy.types.NodeTree):
     for n in getattr(tree, "nodes", []):
