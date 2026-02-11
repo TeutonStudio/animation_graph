@@ -235,10 +235,8 @@ class DefineBoneTransform(_BoneTransform):
         # Output End (UI)
         out_end = self.outputs.get("End")
         if out_end:
-            try:
-                out_end.default_value = float(start + max(0.0, duration))
-            except Exception:
-                pass
+            try: out_end.default_value = float(start + max(0.0, duration))
+            except Exception: pass
 
         # If before start: clear cache entry and do nothing
         cache_key = (

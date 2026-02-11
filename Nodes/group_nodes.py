@@ -67,7 +67,7 @@ def _iter_interface_sockets(ntree, want_in_out=None):
 class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
     """AnimGraph group instance node."""
 
-    bl_idname = "ANIMGRAPH_Group"
+    bl_idname = "AnimNodeGroup"
     bl_label = "Group"
     bl_icon = "NODETREE"
 
@@ -84,8 +84,7 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
         self.sync_sockets_from_subtree()
 
     def update(self):
-        if self.node_tree:
-            ensure_group_io_nodes(self.node_tree)
+        if self.node_tree: ensure_group_io_nodes(self.node_tree)
         self.sync_sockets_from_subtree()
 
     def draw_buttons(self, context, layout):
@@ -128,28 +127,27 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
         # _sync_node_sockets(self.outputs, iface_outputs)
 
 
-class _GroupSocketNode(bpy.types.Node, AnimGraphNodeMixin):
-    socket_1 = None
-    socket_2 = None
+# class _GroupSocketNode(bpy.types.Node, AnimGraphNodeMixin):
+#     socket_1 = None
+#     socket_2 = None
 
-    def init(self, context):
-        self.sync_from_tree_interface()
+#     def init(self, context):
+#         self.sync_from_tree_interface()
 
-    def update(self):
-        self.sync_from_tree_interface()
+#     def update(self):
+#         self.sync_from_tree_interface()
 
-    def sync_from_tree_interface(self):
-        tree = self.id_data
-        if not tree or getattr(tree, "bl_idname", None) != "AnimNodeTree":
-            return
+#     def sync_from_tree_interface(self):
+#         tree = self.id_data
+#         if not tree or getattr(tree, "bl_idname", None) != "AnimNodeTree":
+#             return
 
-        iface_sockets = _iter_interface_sockets(tree, want_in_out=self.socket_1)
+#         iface_sockets = _iter_interface_sockets(tree, want_in_out=self.socket_1)
 
-        target_list = self.outputs if self.socket_2 == "OUTPUTS" else self.inputs
+#         target_list = self.outputs if self.socket_2 == "OUTPUTS" else self.inputs
 
-        # WICHTIG: auch bei leer -> clear
-        _sync_node_sockets(target_list, iface_sockets)
-
+#         # WICHTIG: auch bei leer -> clear
+#         _sync_node_sockets(target_list, iface_sockets)
 
 
 # class AnimGroupInputNode(_GroupSocketNode, bpy.types.NodeGroupInput):
@@ -172,34 +170,51 @@ class _GroupSocketNode(bpy.types.Node, AnimGraphNodeMixin):
 #     socket_2 = "INPUTS"
 
 
-def add_node(tree:bpy.types.NodeTree, node_type:str):
-    for area in bpy.context.window.screen.areas:
-        if area.type == 'NODE_EDITOR':
+def add_node(tree: bpy.types.NodeTree, node_type: str):
+    ctx = bpy.context
+
+    win = ctx.window
+    if not win:
+        return False
+
+    scr = win.screen
+    if not scr:
+        return False
+
+    for area in scr.areas:
+        if area.type != 'NODE_EDITOR':
+            continue
+
+        space = area.spaces.active
+        if not space or space.type != 'NODE_EDITOR':
+            continue
+
+        # ganz wichtig: wir müssen den NodeTree setzen, in den wir einfügen wollen
+        prev_tree = space.node_tree
+        space.node_tree = tree
+
+        try:
             for region in area.regions:
-                if region.type == 'WINDOW':
-                    override = {
-                        "window": bpy.context.window,
-                        "screen": bpy.context.window.screen,
-                        "area": area,
-                        "region": region,
-                        "space_data": area.spaces.active,
-                    }
-                    override["space_data"].node_tree = tree
-                    bpy.ops.node.add_node(override, type=node_type, use_transform=False)
+                if region.type != 'WINDOW':
+                    continue
+
+                with ctx.temp_override(window=win, screen=scr, area=area, region=region, space_data=space):
+                    bpy.ops.node.add_node(type=node_type, use_transform=False)
+                return True
+        finally:
+            # restore, sonst “leakst” du UI state
+            space.node_tree = prev_tree
+
+    return False
+
 
 
 def ensure_group_io_nodes(subtree: bpy.types.NodeTree):
-    if not subtree or getattr(subtree, "bl_idname", None) != "AnimNodeTree":
-        return
+    if not subtree or getattr(subtree, "bl_idname", None) != "AnimNodeTree": return 
 
-    has_in = any(n.bl_idname == "ANIMGRAPH_GroupInput" for n in subtree.nodes)
-    has_out = any(n.bl_idname == "ANIMGRAPH_GroupOutput" for n in subtree.nodes)
+    has_in  = any(getattr(n, "type", None) == "GROUP_INPUT"  for n in subtree.nodes)
+    has_out = any(getattr(n, "type", None) == "GROUP_OUTPUT" for n in subtree.nodes)
 
-    if not has_in: add_node(subtree,"NodeGroupInput")
-        # n = subtree.nodes.new("ANIMGRAPH_GroupInput")
-        # n.location = (-300, 0)
-
-    if not has_out: add_node(subtree,"NodeGroupOutput")
-        # n = subtree.nodes.new("ANIMGRAPH_GroupOutput")
-        # n.location = (300, 0)
+    if not has_in: add_node(subtree, "NodeGroupInput")
+    if not has_out: add_node(subtree, "NodeGroupOutput")
 

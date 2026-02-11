@@ -46,7 +46,7 @@ def _sync_group_instances_referencing(subtree: bpy.types.NodeTree):
         if getattr(host, "bl_idname", None) != AnimNodeTree.bl_idname:
             continue
         for n in getattr(host, "nodes", []):
-            if getattr(n, "bl_idname", "") == "ANIMGRAPH_Group" and getattr(n, "node_tree", None) == subtree:
+            if getattr(n, "bl_idname", "") == "AnimNodeGroup" and getattr(n, "node_tree", None) == subtree:
                 try:
                     n.sync_sockets_from_subtree()
                 except Exception:

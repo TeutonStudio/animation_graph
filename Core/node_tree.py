@@ -26,33 +26,33 @@ class AnimNodeTree(bpy.types.NodeTree):
         options={"HIDDEN"},
     )
 
-    # def interface_update(self, context):
-    #     # 1) IO-Nodes im *gleichen* Tree (das ist der Tree dessen Interface gerade geändert wurde)
-    #     for n in getattr(self, "nodes", []):
-    #         if n.bl_idname == NodeGroupInput.bl_idname:
-    #             try: n.sync_from_tree_interface()
-    #             except Exception: pass
-    #         elif n.bl_idname == NodeGroupOutput.bl_idname:
-    #             try: n.sync_from_tree_interface()
-    #             except Exception: pass
+    def interface_update(self, context):
+        # 1) IO-Nodes im *gleichen* Tree (das ist der Tree dessen Interface gerade geändert wurde)
+        for n in getattr(self, "nodes", []):
+            if n.bl_idname == NodeGroupInput.bl_idname:
+                try: n.sync_from_tree_interface()
+                except Exception: pass
+            elif n.bl_idname == NodeGroupOutput.bl_idname:
+                try: n.sync_from_tree_interface()
+                except Exception: pass
 
-    #     # 2) Alle Group-Instanzen in *anderen* Trees, die diese node_tree benutzen
-    #     #    (sonst aktualisiert sich deine Group-Node im Parent-Tree nie)
-    #     for parent in bpy.data.node_groups:
-    #         if getattr(parent, "bl_idname", None) != AnimNodeTree.bl_idname:
-    #             continue
+        # 2) Alle Group-Instanzen in *anderen* Trees, die diese node_tree benutzen
+        #    (sonst aktualisiert sich deine Group-Node im Parent-Tree nie)
+        for parent in bpy.data.node_groups:
+            if getattr(parent, "bl_idname", None) != AnimNodeTree.bl_idname:
+                continue
 
-    #         touched = False
-    #         for node in parent.nodes:
-    #             if node.bl_idname == AnimGroupNode.bl_idname and node.node_tree == self:
-    #                 try:
-    #                     node.sync_sockets_from_subtree()
-    #                     touched = True
-    #                 except Exception: pass
+            touched = False
+            for node in parent.nodes:
+                if node.bl_idname == "AnimGroupNode" and node.node_tree == self:
+                    try:
+                        node.sync_sockets_from_subtree()
+                        touched = True
+                    except Exception: pass
 
-    #         if touched:
-    #             try: parent.update_tag()   # UI/Depsgraph refresh
-    #             except Exception: pass
+            if touched:
+                try: parent.update_tag()   # UI/Depsgraph refresh
+                except Exception: pass
 
 
     def update(self):
