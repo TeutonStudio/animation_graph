@@ -108,11 +108,25 @@ class AnimGroupNode(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
             self.outputs.clear()
             return
 
-        iface_inputs = _iter_interface_sockets(sub, want_in_out="INPUT")
-        iface_outputs = _iter_interface_sockets(sub, want_in_out="OUTPUT")
+        # bpy.data.node_groups.get(self.node_tree.name) == self.node_tree (sollte)
+        # self.node_tree.name == self.name ??
 
-        _sync_node_sockets(self.inputs, iface_inputs)
-        _sync_node_sockets(self.outputs, iface_outputs)
+        iface_inputs = []
+        iface_outputs = []
+        for i in self.node_tree.interface.items_tree:
+            if i.item_type == 'SOCKET':
+                liste = iface_inputs.append if i.in_out == 'INPUT' else iface_outputs.append
+                liste(i)
+        
+        self.inputs.clear()
+        self.outputs.clear()
+        for i in iface_inputs: self.inputs.new(i.bl_socket_idname,i.name)
+        for i in iface_outputs: self.outputs.new(i.bl_socket_idname,i.name)
+        # iface_inputs = _iter_interface_sockets(sub, want_in_out="INPUT")
+        # iface_outputs = _iter_interface_sockets(sub, want_in_out="OUTPUT")
+
+        # _sync_node_sockets(self.inputs, iface_inputs)
+        # _sync_node_sockets(self.outputs, iface_outputs)
 
 
 class _GroupSocketNode(bpy.types.Node, AnimGraphNodeMixin):

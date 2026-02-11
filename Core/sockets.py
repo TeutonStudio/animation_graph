@@ -93,30 +93,30 @@ class NodeSocketBone(bpy.types.NodeSocket):
 
 validLinks = {
     NodeSocketBone.bl_idname:[NodeSocketBone.bl_idname],
-    bpy.types.NodeSocketInt.bl_idname:[bpy.types.NodeSocketInt.bl_idname],
-    bpy.types.NodeSocketFloat.bl_idname:[
-        bpy.types.NodeSocketFloat.bl_idname,
-        bpy.types.NodeSocketInt.bl_idname,
+    "NodeSocketInt":["NodeSocketInt"],
+    "NodeSocketFloat":[
+        "NodeSocketFloat",
+        "NodeSocketInt",
     ],
-    bpy.types.NodeSocketVectorXYZ.bl_idname:[
-        bpy.types.NodeSocketVectorXYZ.bl_idname,
-        bpy.types.NodeSocketVector.bl_idname,
+    "NodeSocketVectorXYZ":[
+        "NodeSocketVectorXYZ",
+        "NodeSocketVector",
     ],
-    bpy.types.NodeSocketRotation.bl_idname:[
-        bpy.types.NodeSocketRotation.bl_idname,
-        bpy.types.NodeSocketVector.bl_idname,
+    "NodeSocketRotation":[
+        "NodeSocketRotation",
+        "NodeSocketVector",
     ],
-    bpy.types.NodeSocketVectorTranslation.bl_idname:[
-        bpy.types.NodeSocketVectorTranslation.bl_idname,
-        bpy.types.NodeSocketVector.bl_idname,
+    "NodeSocketVectorTranslation":[
+        "NodeSocketVectorTranslation",
+        "NodeSocketVector",
     ],
-    bpy.types.NodeSocketVector.bl_idname:[
-        bpy.types.NodeSocketVector.bl_idname,
-        bpy.types.NodeSocketVectorXYZ.bl_idname,
-        bpy.types.NodeSocketRotation.bl_idname,
-        bpy.types.NodeSocketVectorTranslation.bl_idname,
+    "NodeSocketVector":[
+        "NodeSocketVector",
+        "NodeSocketVectorXYZ",
+        "NodeSocketRotation",
+        "NodeSocketVectorTranslation",
     ],
-    bpy.types.NodeSocketMatrix.bl_idname:[bpy.types.NodeSocketMatrix.bl_idname],
+    "NodeSocketMatrix":["NodeSocketMatrix"],
 }
 def isValidLink(l: bpy.types.NodeLink) -> bool:
     vn = l.from_socket.bl_idname

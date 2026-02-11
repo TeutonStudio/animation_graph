@@ -4,7 +4,7 @@ import bpy
 from bpy.types import NodeTree, Node, NodeSocket, FunctionNodeIntegerMath
 from bpy.props import FloatProperty, EnumProperty, FloatVectorProperty, StringProperty, PointerProperty
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
-from .Nodes.group_nodes import AnimGroupNode, AnimGroupInputNode, AnimGroupOutputNode
+from .Nodes.group_nodes import AnimGroupNode
 from .Nodes.mathe_nodes import IntConst, FloatConst, VectorConst, MatrixConst, IntMath, FloatMath, VectorMath, CombineXYZ, SeparateXYZ, MatrixMultiply, ComposeMatrix, DecomposeMatrix
 from .Nodes.bone_node import DefineBoneNode
 from .Nodes.bone_transform_nodes import DefineBoneTransform, ReadBoneTransform
@@ -81,18 +81,17 @@ _NODE_CATEGORIES = [
         "Group",
         items=[
             NodeItem(AnimGroupNode.bl_idname),
-            NodeItem(bpy.types.NodeGroupInput.bl_idname),
-            NodeItem(bpy.types.NodeGroupOutput.bl_idname),
+            NodeItem("NodeGroupInput"),
+            NodeItem("NodeGroupOutput"),
         ],
     ),
 ]
 
 
 _CLASSES = (
-    DefineBoneNode,
     AnimGroupNode,
-    # AnimGroupInputNode,
-    # AnimGroupOutputNode,
+    
+    DefineBoneNode,
     DefineBoneTransform,
     ReadBoneTransform,
 
