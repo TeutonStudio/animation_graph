@@ -221,21 +221,19 @@ class DefineBoneTransform(_BoneTransform):
           - ctx.touched_armatures (set) to update_tag once per armature
         """
         arm_ob, bone_name = self.socket_bone_ref("Bone")
-        if not arm_ob or arm_ob.type != "ARMATURE" or not bone_name:
-            return
+        if not arm_ob or arm_ob.type != "ARMATURE" or not bone_name: return
 
         pbone = arm_ob.pose.bones.get(bone_name)
-        if not pbone:
-            return
+        if not pbone: return
 
-        start = self.socket_float(tree, "Start", scene, ctx, 0.0)
-        duration = self.socket_float(tree, "Duration", scene, ctx, 10.0)
+        start = self.socket_int(tree, "Start", scene, ctx, 0)
+        duration = self.socket_int(tree, "Duration", scene, ctx, 10)
         frame = float(scene.frame_current)
 
         # Output End (UI)
         out_end = self.outputs.get("End")
         if out_end:
-            try: out_end.default_value = float(start + max(0.0, duration))
+            try: out_end.default_value = float(start + max(0, duration))
             except Exception: pass
 
         # If before start: clear cache entry and do nothing
@@ -244,8 +242,8 @@ class DefineBoneTransform(_BoneTransform):
             self.as_pointer(),
             arm_ob.as_pointer(),
             bone_name,
-            float(start),
-            float(duration),
+            int(start),
+            int(duration),
         )
 
         if frame < start:
@@ -253,8 +251,7 @@ class DefineBoneTransform(_BoneTransform):
             return
 
         # time -> [0..1]
-        if duration <= 0.0:
-            t = 1.0
+        if duration <= 0.0: t = 1.0
         else:
             t = (frame - start) / duration
             if t < 0.0: t = 0.0
@@ -278,17 +275,14 @@ class DefineBoneTransform(_BoneTransform):
                 return
 
             m_t = m_in if mode == "TO" else (state["mat"] @ m_in)
-            try:
-                loc_t, rot_t_q, scale_t = m_t.decompose()
+            try: loc_t, rot_t_q, scale_t = m_t.decompose()
             except Exception:
                 ctx.touched_armatures.add(arm_ob)
                 return
 
             # start rot as quat
-            if state["rot_mode"] == "QUATERNION":
-                start_q = Quaternion(state["rot"])
-            else:
-                start_q = Euler(state["rot"]).to_quaternion()
+            if state["rot_mode"] == "QUATERNION": start_q = Quaternion(state["rot"])
+            else: start_q = Euler(state["rot"]).to_quaternion()
 
             rot_q = start_q.slerp(rot_t_q, f)
             loc = state["loc"].lerp(loc_t, f)
@@ -369,12 +363,10 @@ class ReadBoneTransform(_BoneTransform):
 
     def evaluate(self, tree, scene, ctx):
         arm_ob, bone_name = self.socket_bone_ref("Bone")
-        if not arm_ob or arm_ob.type != "ARMATURE" or not bone_name:
-            return
+        if not arm_ob or arm_ob.type != "ARMATURE" or not bone_name: return
 
         pbone = arm_ob.pose.bones.get(bone_name)
-        if not pbone:
-            return
+        if not pbone: return
 
         # Bone length (rest bone)
         out_len = self.outputs.get("Length")
@@ -382,8 +374,7 @@ class ReadBoneTransform(_BoneTransform):
             try:
                 b = pbone.bone
                 out_len.default_value = float((b.tail_local - b.head_local).length)
-            except Exception:
-                pass
+            except Exception: pass
 
         mode = getattr(self, "apply_mode", "TO")
         rep = getattr(self, "representation", "COMPONENTS")
@@ -392,24 +383,22 @@ class ReadBoneTransform(_BoneTransform):
         cur_loc = pbone.location.copy()
         cur_scale = pbone.scale.copy()
 
-        if pbone.rotation_mode == "QUATERNION":
-            cur_rot_q = pbone.rotation_quaternion.copy()
-        else:
-            cur_rot_q = pbone.rotation_euler.to_quaternion()
+        if pbone.rotation_mode == "QUATERNION": cur_rot_q = pbone.rotation_quaternion.copy()
+        else: cur_rot_q = pbone.rotation_euler.to_quaternion()
 
         cur_mat = pbone.matrix_basis.copy()
 
         if mode == "DELTA":
             # Capture "start" pose once at/after Start (no frame-jumping)
-            start = self.socket_float(tree, "Start", scene, ctx, float(scene.frame_current))
-            frame = float(scene.frame_current)
+            start = self.socket_int(tree, "Start", scene, ctx, float(scene.frame_current))
+            frame = int(scene.frame_current)
 
             cache_key = (
                 tree.as_pointer(),
                 self.as_pointer(),
                 arm_ob.as_pointer(),
                 bone_name,
-                float(start),
+                int(start),
             )
 
             if frame < start:
@@ -433,24 +422,19 @@ class ReadBoneTransform(_BoneTransform):
             ))
 
             # Rotation delta: q_delta = q_start^-1 * q_cur
-            if state["rot_mode"] == "QUATERNION":
-                start_q = Quaternion(state["rot"])
-            else:
-                start_q = Euler(state["rot"]).to_quaternion()
+            if state["rot_mode"] == "QUATERNION": start_q = Quaternion(state["rot"])
+            else: start_q = Euler(state["rot"]).to_quaternion()
 
             cur_rot_q = start_q.inverted() @ cur_rot_q
 
             # Matrix delta (approx): M_delta = M_start^-1 * M_cur
-            try:
-                cur_mat = state["mat"].inverted() @ cur_mat
-            except Exception:
-                pass
+            try: cur_mat = state["mat"].inverted() @ cur_mat
+            except Exception: pass
 
         # Write outputs
         if rep == "MATRIX":
             out_m = self.outputs.get("Matrix")
-            if out_m:
-                out_m.default_value = cur_mat
+            if out_m: out_m.default_value = cur_mat
             return
 
         # COMPONENTS
@@ -458,11 +442,9 @@ class ReadBoneTransform(_BoneTransform):
         out_r = self.outputs.get("Rotation")
         out_s = self.outputs.get("Scale")
 
-        if out_t:
-            out_t.default_value = (cur_loc.x, cur_loc.y, cur_loc.z)
+        if out_t: out_t.default_value = (cur_loc.x, cur_loc.y, cur_loc.z)
 
-        if out_s:
-            out_s.default_value = (cur_scale.x, cur_scale.y, cur_scale.z)
+        if out_s: out_s.default_value = (cur_scale.x, cur_scale.y, cur_scale.z)
 
         if out_r:
             try:
