@@ -176,10 +176,10 @@ class DefineBoneTransform(_BoneTransform):
 
     def update_representation(self, context): self.update()
     def update_mode(self, context): self.update()
+
     def init(self, context):
         super().init(context)
 
-        # Components inputs
         p = self.inputs.new("NodeSocketVectorTranslation", "Translation")
         r = self.inputs.new("NodeSocketRotation", "Rotation")
         sc = self.inputs.new("NodeSocketVectorXYZ", "Scale")
@@ -187,9 +187,9 @@ class DefineBoneTransform(_BoneTransform):
             p.default_value = (0.0, 0.0, 0.0)
             r.default_value = (0.0, 0.0, 0.0)
             sc.default_value = (1.0, 1.0, 1.0)
-        except Exception: pass
+        except Exception:
+            pass
 
-        # Matrix input
         m = self.inputs.new("NodeSocketMatrix", "Matrix")
         try:
             m.default_value = (
@@ -198,7 +198,8 @@ class DefineBoneTransform(_BoneTransform):
                 (0.0, 0.0, 1.0, 0.0),
                 (0.0, 0.0, 0.0, 1.0),
             )
-        except Exception: pass
+        except Exception:
+            pass
 
         self.outputs.new("NodeSocketInt", "End")
         self.update()
@@ -214,36 +215,40 @@ class DefineBoneTransform(_BoneTransform):
         col.prop(self, "easing")
 
     def evaluate(self, tree, scene, ctx):
-        """
-        Applies this node to the target pose bone.
-        ctx must provide:
-          - ctx.pose_cache (dict) for start pose caching
-          - ctx.touched_armatures (set) to update_tag once per armature
-        """
         arm_ob, bone_name = self.socket_bone_ref("Bone")
-        if not arm_ob or arm_ob.type != "ARMATURE" or not bone_name: return
+        if not arm_ob or arm_ob.type != "ARMATURE" or not bone_name:
+            return
 
         pbone = arm_ob.pose.bones.get(bone_name)
-        if not pbone: return
+        if not pbone:
+            return
 
-        start = self.socket_int(tree, "Start", scene, ctx, 0)
-        duration = self.socket_int(tree, "Duration", scene, ctx, 10)
-        frame = float(scene.frame_current)
+        # deterministisch: alles als int frames
+        start = int(self.socket_int(tree, "Start", scene, ctx, 0))
+        duration = int(self.socket_int(tree, "Duration", scene, ctx, 10))
+        frame = int(scene.frame_current)
 
-        # Output End (UI)
+        end_value = start + max(0, duration)
+
+        # UI output (optional)
         out_end = self.outputs.get("End")
         if out_end:
-            try: out_end.default_value = int(start + max(0, duration))
-            except Exception: pass
+            try:
+                out_end.default_value = int(end_value)
+            except Exception:
+                pass
 
-        # If before start: clear cache entry and do nothing
+        # RUNTIME output (das ist der eigentliche Fix)
+        # Andere Nodes lesen diesen Wert aus ctx.values, nicht aus default_value.
+        self.set_output_value(ctx, "End", int(end_value))
+
         cache_key = (
             tree.as_pointer(),
             self.as_pointer(),
             arm_ob.as_pointer(),
             bone_name,
-            int(start),
-            int(duration),
+            start,
+            duration,
         )
 
         if frame < start:
@@ -251,15 +256,17 @@ class DefineBoneTransform(_BoneTransform):
             return
 
         # time -> [0..1]
-        if duration <= 0.0: t = 1.0
+        if duration <= 0:
+            t = 1.0
         else:
-            t = (frame - start) / duration
+            t = (frame - start) / float(duration)
             if t < 0.0: t = 0.0
             if t > 1.0: t = 1.0
 
-        f = _interp_factor(t, getattr(self, "interpolation", "BEZIER"), getattr(self, "easing", "AUTO"))
+        f = _interp_factor(t,
+                           getattr(self, "interpolation", "BEZIER"),
+                           getattr(self, "easing", "AUTO"))
 
-        # cache start pose at first evaluation after start
         state = ctx.pose_cache.get(cache_key)
         if state is None:
             state = _capture_start_pose(pbone)
@@ -275,14 +282,16 @@ class DefineBoneTransform(_BoneTransform):
                 return
 
             m_t = m_in if mode == "TO" else (state["mat"] @ m_in)
-            try: loc_t, rot_t_q, scale_t = m_t.decompose()
+            try:
+                loc_t, rot_t_q, scale_t = m_t.decompose()
             except Exception:
                 ctx.touched_armatures.add(arm_ob)
                 return
 
-            # start rot as quat
-            if state["rot_mode"] == "QUATERNION": start_q = Quaternion(state["rot"])
-            else: start_q = Euler(state["rot"]).to_quaternion()
+            if state["rot_mode"] == "QUATERNION":
+                start_q = Quaternion(state["rot"])
+            else:
+                start_q = Euler(state["rot"]).to_quaternion()
 
             rot_q = start_q.slerp(rot_t_q, f)
             loc = state["loc"].lerp(loc_t, f)
@@ -390,7 +399,7 @@ class ReadBoneTransform(_BoneTransform):
 
         if mode == "DELTA":
             # Capture "start" pose once at/after Start (no frame-jumping)
-            start = self.socket_int(tree, "Start", scene, ctx, float(scene.frame_current))
+            start = self.socket_int(tree, "Start", scene, ctx, int(scene.frame_current))
             frame = int(scene.frame_current)
 
             cache_key = (
