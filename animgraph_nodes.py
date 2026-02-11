@@ -4,7 +4,7 @@ import bpy
 from bpy.types import NodeTree, Node, NodeSocket, FunctionNodeIntegerMath
 from bpy.props import FloatProperty, EnumProperty, FloatVectorProperty, StringProperty, PointerProperty
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
-from .Nodes.group_nodes import AnimGroupNode
+from .Nodes.group_nodes import AnimNodeGroup
 from .Nodes.mathe_nodes import IntConst, FloatConst, VectorConst, MatrixConst, IntMath, FloatMath, VectorMath, CombineXYZ, SeparateXYZ, MatrixMultiply, ComposeMatrix, DecomposeMatrix
 from .Nodes.bone_node import DefineBoneNode
 from .Nodes.bone_transform_nodes import DefineBoneTransform, ReadBoneTransform
@@ -26,9 +26,7 @@ def unregister():
 
 class AnimGraphNodeCategory(NodeCategory):
     @classmethod
-    def poll(cls, context):
-        # Add-Menü darf immer verfügbar sein
-        return True
+    def poll(cls, context): return True
 
 
 _NODE_CATS_ID = "ANIMGRAPH_NODE_CATEGORIES"
@@ -80,7 +78,7 @@ _NODE_CATEGORIES = [
         "ANIMGRAPH_GROUP",
         "Group",
         items=[
-            NodeItem(AnimGroupNode.bl_idname),
+            NodeItem(AnimNodeGroup.bl_idname),
             NodeItem("NodeGroupInput"),
             NodeItem("NodeGroupOutput"),
         ],
@@ -89,8 +87,8 @@ _NODE_CATEGORIES = [
 
 
 _CLASSES = (
-    AnimGroupNode,
-    
+    AnimNodeGroup,
+
     DefineBoneNode,
     DefineBoneTransform,
     ReadBoneTransform,

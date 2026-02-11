@@ -6,7 +6,6 @@ from bpy.props import EnumProperty
 from mathutils import Vector, Euler, Matrix, Quaternion
 
 from .Mixin import AnimGraphNodeMixin
-from ..Core.sockets import NodeSocketBone
 
 
 # -----------------------------
@@ -136,9 +135,9 @@ class _BoneTransform(Node, AnimGraphNodeMixin):
             sockets["Matrix"].hide = not use_matrix
 
     def init(self, context):
-        self.inputs.new(NodeSocketBone.bl_idname,NodeSocketBone.label)
-        s = self.inputs.new(bpy.types.NodeSocketInt.bl_idname, "Start")
-        d = self.inputs.new(bpy.types.NodeSocketInt.bl_idname, "Duration")
+        self.inputs.new("NodeSocketBone","Bone")
+        s = self.inputs.new("NodeSocketInt", "Start")
+        d = self.inputs.new("NodeSocketInt", "Duration")
         try:
             s.default_value = 0
             d.default_value = 10
@@ -181,9 +180,9 @@ class DefineBoneTransform(_BoneTransform):
         super().init(context)
 
         # Components inputs
-        p = self.inputs.new(bpy.types.NodeSocketVectorTranslation.bl_idname, "Translation")
-        r = self.inputs.new(bpy.types.NodeSocketRotation.bl_idname, "Rotation")
-        sc = self.inputs.new(bpy.types.NodeSocketVectorXYZ.bl_idname, "Scale")
+        p = self.inputs.new("NodeSocketVectorTranslation", "Translation")
+        r = self.inputs.new("NodeSocketRotation", "Rotation")
+        sc = self.inputs.new("NodeSocketVectorXYZ", "Scale")
         try:
             p.default_value = (0.0, 0.0, 0.0)
             r.default_value = (0.0, 0.0, 0.0)
@@ -191,7 +190,7 @@ class DefineBoneTransform(_BoneTransform):
         except Exception: pass
 
         # Matrix input
-        m = self.inputs.new(bpy.types.NodeSocketMatrix.bl_idname, "Matrix")
+        m = self.inputs.new("NodeSocketMatrix", "Matrix")
         try:
             m.default_value = (
                 (1.0, 0.0, 0.0, 0.0),
@@ -201,7 +200,7 @@ class DefineBoneTransform(_BoneTransform):
             )
         except Exception: pass
 
-        self.outputs.new(bpy.types.NodeSocketInt.bl_idname, "End")
+        self.outputs.new("NodeSocketInt", "End")
         self.update()
 
     def update(self):
@@ -353,11 +352,11 @@ class ReadBoneTransform(_BoneTransform):
         # self.inputs.new("NodeSocketInt", "End")
 
         # Outputs
-        self.outputs.new(bpy.types.NodeSocketVectorTranslation.bl_idname, "Translation")
-        self.outputs.new(bpy.types.NodeSocketRotation.bl_idname, "Rotation")
-        self.outputs.new(bpy.types.NodeSocketVectorXYZ.bl_idname, "Scale")
-        self.outputs.new(bpy.types.NodeSocketMatrix.bl_idname, "Matrix")
-        self.outputs.new(bpy.types.NodeSocketFloat.bl_idname, "Length")
+        self.outputs.new("NodeSocketVectorTranslation", "Translation")
+        self.outputs.new("NodeSocketRotation", "Rotation")
+        self.outputs.new("NodeSocketVectorXYZ", "Scale")
+        self.outputs.new("NodeSocketMatrix", "Matrix")
+        self.outputs.new("NodeSocketFloat", "Length")
 
         self.update()
 

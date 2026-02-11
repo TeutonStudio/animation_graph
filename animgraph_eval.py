@@ -126,7 +126,7 @@ def _on_depsgraph_update(scene, depsgraph):
         for area in scr.areas:
             if area.type == "NODE_EDITOR":
                 space = area.spaces.active
-                if space.edit_tree and getattr(space.edit_tree, "bl_idname", "") == "ANIMGRAPH_Tree":
+                if space.edit_tree and getattr(space.edit_tree, "bl_idname", "") == "AnimNodeTree":
                     space.overlay.show_context_path = True
 
     # Dirty flag handling + optional redraw

@@ -13,7 +13,7 @@ def unregister():
 class AnimNodeTree(bpy.types.NodeTree):
     """AnimGraph node tree."""
 
-    bl_idname = "ANIMGRAPH_Tree"
+    bl_idname = "AnimNodeTree"
     bl_label = "Animation Node Editor"
     bl_icon = "ARMATURE_DATA"
     bl_description = "Wird verwendet um eine Amatur Pose abhängig vom Zeitpunkt zu definieren"

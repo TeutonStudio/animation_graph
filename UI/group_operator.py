@@ -5,7 +5,7 @@ from bpy.types import Operator
 from bpy.props import StringProperty
 
 
-from ..Nodes.group_nodes import AnimGroupNode, ensure_group_io_nodes
+from ..Nodes.group_nodes import AnimNodeGroup, ensure_group_io_nodes
 from ..Core.node_tree import AnimNodeTree
 
 def register():
