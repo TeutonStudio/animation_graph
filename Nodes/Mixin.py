@@ -3,12 +3,17 @@
 import bpy
 from mathutils import Vector, Matrix
 
+# animation_graph/Nodes/Mixin.py
+
+import bpy
+from mathutils import Vector, Matrix
+
 class AnimGraphNodeMixin:
     """
-    Minimaler Evaluations-Mixin:
-    - Upstream Evaluation (single-link MVP)
+    Evaluations-Mixin (single-link MVP, aber deterministisch):
+    - Upstream Evaluation (einmal pro Frame)
+    - Runtime-Value Propagation über ctx.values statt socket.default_value
     - Typed socket getter: int/float/vector/matrix
-    - Bone socket resolver (linked/unlinked)
     """
 
     @classmethod
@@ -16,14 +21,44 @@ class AnimGraphNodeMixin:
         return hasattr(ntree, "nodes")
 
     # -----------------------------
+    # internal helpers
+    # -----------------------------
+    def _frame_key(self, tree, scene):
+        # Frame als int, damit es keine Float-Schlenker gibt
+        return (tree.as_pointer(), int(scene.frame_current))
+
+    def _out_key(self, sock_name: str):
+        # Schlüssel, unter dem Outputs im ctx.values landen
+        return (self.as_pointer(), sock_name)
+
+    def _ensure_ctx_runtime(self, ctx):
+        # pro Frame neu: ctx.values; persistent: pose_cache etc.
+        if not hasattr(ctx, "values") or ctx.values is None:
+            ctx.values = {}
+        if not hasattr(ctx, "eval_cache") or ctx.eval_cache is None:
+            ctx.eval_cache = set()
+        if not hasattr(ctx, "eval_stack") or ctx.eval_stack is None:
+            ctx.eval_stack = set()
+
+    def set_output_value(self, ctx, sock_name: str, value):
+        self._ensure_ctx_runtime(ctx)
+        ctx.values[self._out_key(sock_name)] = value
+
+    def get_output_value(self, ctx, node_ptr: int, sock_name: str, fallback=None):
+        self._ensure_ctx_runtime(ctx)
+        return ctx.values.get((node_ptr, sock_name), fallback)
+
+    # -----------------------------
     # evaluation plumbing
     # -----------------------------
     def eval_upstream(self, tree, scene, ctx):
         """
         Ensures this node is evaluated once per frame.
-        ctx needs: ctx.eval_cache (set)
+        ctx needs: ctx.eval_cache (set), ctx.values (dict)
         """
-        key = (tree.as_pointer(), self.as_pointer(), float(scene.frame_current))
+        self._ensure_ctx_runtime(ctx)
+
+        key = (tree.as_pointer(), self.as_pointer(), int(scene.frame_current))
         if key in ctx.eval_cache:
             return
         ctx.eval_cache.add(key)
@@ -34,8 +69,11 @@ class AnimGraphNodeMixin:
 
     def eval_socket(self, tree, sock, scene, ctx):
         """
-        Follow first link, evaluate upstream node, return default_value.
+        Follow first link, evaluate upstream node, then read runtime output from ctx.values.
+        Falls back to default_value only if unlinked.
         """
+        self._ensure_ctx_runtime(ctx)
+
         if sock is None:
             return None
 
@@ -44,14 +82,21 @@ class AnimGraphNodeMixin:
             from_sock = link.from_socket
             from_node = from_sock.node
 
-            if hasattr(from_node, "eval_upstream"):
-                from_node.eval_upstream(tree, scene, ctx)
-            else:
-                # Node without mixin, can't evaluate upstream
-                pass
+            # recursion guard (cycles kill determinism)
+            guard = (tree.as_pointer(), from_node.as_pointer(), int(scene.frame_current))
+            if guard in ctx.eval_stack:
+                return getattr(from_sock, "default_value", None)  # last resort
+            ctx.eval_stack.add(guard)
+            try:
+                if hasattr(from_node, "eval_upstream"):
+                    from_node.eval_upstream(tree, scene, ctx)
+                # Runtime-Wert lesen (nicht default_value!)
+                return ctx.values.get((from_node.as_pointer(), from_sock.name),
+                                      getattr(from_sock, "default_value", None))
+            finally:
+                ctx.eval_stack.discard(guard)
 
-            return getattr(from_sock, "default_value", None)
-
+        # unlinked: UI default
         return getattr(sock, "default_value", None)
 
     # -----------------------------
@@ -94,24 +139,19 @@ class AnimGraphNodeMixin:
             return fallback
 
     # -----------------------------
-    # bone socket helpers
+    # bone socket helpers (unverändert)
     # -----------------------------
     def socket_bone_ref(self, socket_name="Bone"):
-        """
-        Returns (arm_obj, bone_name) from NodeSocketBone, linked or unlinked.
-        """
         s = self.inputs.get(socket_name) if self else None
         if not s:
             return (None, "")
 
-        # linked: take from source socket
         if getattr(s, "is_linked", False) and s.links:
             from_sock = s.links[0].from_socket
             arm = getattr(from_sock, "armature_obj", None)
             bone = getattr(from_sock, "bone_name", "") or ""
             return (arm, bone)
 
-        # unlinked: take from the socket itself
         arm = getattr(s, "armature_obj", None)
         bone = getattr(s, "bone_name", "") or ""
         return (arm, bone)
