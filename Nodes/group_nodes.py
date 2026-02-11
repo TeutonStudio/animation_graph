@@ -174,20 +174,16 @@ def add_node(tree: bpy.types.NodeTree, node_type: str):
     ctx = bpy.context
 
     win = ctx.window
-    if not win:
-        return False
+    if not win: return False
 
     scr = win.screen
-    if not scr:
-        return False
+    if not scr: return False
 
     for area in scr.areas:
-        if area.type != 'NODE_EDITOR':
-            continue
+        if area.type != 'NODE_EDITOR': continue
 
         space = area.spaces.active
-        if not space or space.type != 'NODE_EDITOR':
-            continue
+        if not space or space.type != 'NODE_EDITOR': continue
 
         # ganz wichtig: wir müssen den NodeTree setzen, in den wir einfügen wollen
         prev_tree = space.node_tree
@@ -195,8 +191,7 @@ def add_node(tree: bpy.types.NodeTree, node_type: str):
 
         try:
             for region in area.regions:
-                if region.type != 'WINDOW':
-                    continue
+                if region.type != 'WINDOW': continue
 
                 with ctx.temp_override(window=win, screen=scr, area=area, region=region, space_data=space):
                     bpy.ops.node.add_node(type=node_type, use_transform=False)
@@ -210,11 +205,41 @@ def add_node(tree: bpy.types.NodeTree, node_type: str):
 
 
 def ensure_group_io_nodes(subtree: bpy.types.NodeTree):
-    if not subtree or getattr(subtree, "bl_idname", None) != "AnimNodeTree": return 
+    if not subtree or getattr(subtree, "bl_idname", None) != "AnimNodeTree":
+        return
 
-    has_in  = any(getattr(n, "type", None) == "GROUP_INPUT"  for n in subtree.nodes)
-    has_out = any(getattr(n, "type", None) == "GROUP_OUTPUT" for n in subtree.nodes)
+    # Helper: find existing
+    def find_group_input():
+        for n in subtree.nodes:
+            if getattr(n, "type", None) == "GROUP_INPUT":
+                return n
+        return None
 
-    if not has_in: add_node(subtree, "NodeGroupInput")
-    if not has_out: add_node(subtree, "NodeGroupOutput")
+    def find_group_output():
+        for n in subtree.nodes:
+            if getattr(n, "type", None) == "GROUP_OUTPUT":
+                return n
+        return None
+
+    # 1) ensure input
+    n_in = find_group_input()
+    if n_in is None:
+        before = {n.as_pointer() for n in subtree.nodes}
+        add_node(subtree, "NodeGroupInput")
+        after = [n for n in subtree.nodes if n.as_pointer() not in before]
+        # pick the created one (fallback: first GROUP_INPUT)
+        n_in = next((n for n in after if getattr(n, "type", None) == "GROUP_INPUT"), None) or find_group_input()
+
+    # 2) ensure output
+    n_out = find_group_output()
+    if n_out is None:
+        before = {n.as_pointer() for n in subtree.nodes}
+        add_node(subtree, "NodeGroupOutput")
+        after = [n for n in subtree.nodes if n.as_pointer() not in before]
+        n_out = next((n for n in after if getattr(n, "type", None) == "GROUP_OUTPUT"), None) or find_group_output()
+
+    # 3) position them sensibly
+    if n_in is not None: n_in.location = (-300.0, 0.0)
+    if n_out is not None: n_out.location = (300.0, 0.0)
+
 
