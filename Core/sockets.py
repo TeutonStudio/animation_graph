@@ -1,0 +1,89 @@
+# animation_graph/Core/sockets.py
+
+import bpy
+
+
+
+class NodeSocketBone(bpy.types.NodeSocket):
+    bl_idname = "NodeSocketBone"
+    bl_label = "Bone"
+
+    armature_obj: bpy.props.PointerProperty(
+        name="Armature",
+        description="Armature-Objekt aus der aktuellen Datei",
+        type=bpy.types.Object,
+        poll=lambda self, obj: obj is not None and obj.type == "ARMATURE",
+        update=_on_armature_changed,
+    )
+
+    bone_name: bpy.props.EnumProperty(
+        name="Bone",
+        description="Bone to use",
+        items=_enum_bones_from_selected_armature,
+    )
+
+    def draw(self, context, layout, node, text):
+        # Socket-Label links im UI
+        if text:
+            layout.label(text=text)
+
+        # Wenn verbunden: nur anzeigen, nicht editierbar (dein bisheriges Verhalten)
+        if self.is_linked and self.links and (not self.is_output):
+            from_sock = self.links[0].from_socket
+            linked_arm = getattr(from_sock, "armature_obj", None)
+            linked_bone = getattr(from_sock, "bone_name", "") or "(kein Bone)"
+            linked_arm_name = linked_arm.name if linked_arm else "(keine Armature)"
+
+            col = layout.column(align=True)
+            col.enabled = False
+            col.label(text=linked_arm_name)
+            col.label(text=linked_bone)
+            return
+
+        # Unlinked (oder Output) -> editierbar:
+        col = layout.column(align=True)
+
+        # 1) Armature wählen
+        col.prop(self, "armature_obj", text="")
+
+        # 2) Bone wählen (nur wenn Armature gültig)
+        arm_obj = self.armature_obj
+        row = col.row(align=True)
+        row.enabled = bool(arm_obj and arm_obj.type == "ARMATURE" and arm_obj.data)
+        row.prop(self, "bone_name", text="")
+
+    def draw_color(self, context, node):
+        return (0.8, 0.7, 0.2, 1.0)
+
+validLinks = {
+    NodeSocketBone.bl_idname:[NodeSocketBone.bl_idname],
+    "NodeSocketInt":["NodeSocketInt"],
+    "NodeSocketFloat":[
+        "NodeSocketFloat",
+        "NodeSocketInt",
+    ],
+    "NodeSocketVectorXYZ":[
+        "NodeSocketVectorXYZ",
+        "NodeSocketVector",
+    ],
+    "NodeSocketRotation":[
+        "NodeSocketRotation",
+        "NodeSocketVector",
+    ],
+    "NodeSocketVectorTranslation":[
+        "NodeSocketVectorTranslation",
+        "NodeSocketVector",
+    ],
+    "NodeSocketVector":[
+        "NodeSocketVector",
+        "NodeSocketVectorXYZ",
+        "NodeSocketRotation",
+        "NodeSocketVectorTranslation",
+    ],
+    "NodeSocketMatrix":["NodeSocketMatrix"],
+}
+def isValidLink(l: bpy.types.NodeLink) -> bool:
+    vn = l.from_socket.bl_idname
+    zn = l.to_socket.bl_idname
+    return zn in validLinks[vn] or vn == zn
+
