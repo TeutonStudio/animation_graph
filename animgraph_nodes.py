@@ -6,7 +6,7 @@ from bpy.props import FloatProperty, EnumProperty, FloatVectorProperty, StringPr
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
 from .Nodes.group_nodes import AnimGroupNode, AnimGroupInputNode, AnimGroupOutputNode
 from .Nodes.mathe_nodes import IntConst, FloatConst, VectorConst, MatrixConst, IntMath, FloatMath, VectorMath, CombineXYZ, SeparateXYZ, MatrixMultiply, ComposeMatrix, DecomposeMatrix
-from .Nodes.bone_node import NodeSocketBone, DefineBoneNode
+from .Nodes.bone_node import DefineBoneNode
 from .Nodes.bone_transform_nodes import DefineBoneTransform, ReadBoneTransform
 
 
@@ -37,9 +37,6 @@ _NODE_CATEGORIES = [
         "ANIMGRAPH_RIGGRAPH",
         "RigGraph",
         items=[
-            NodeItem(AnimGroupNode.bl_idname),
-            NodeItem(AnimGroupInputNode.bl_idname),
-            NodeItem(AnimGroupOutputNode.bl_idname),
             NodeItem(DefineBoneNode.bl_idname),
             NodeItem(DefineBoneTransform.bl_idname),
             NodeItem(ReadBoneTransform.bl_idname),
@@ -69,28 +66,33 @@ _NODE_CATEGORIES = [
     ),
 
     AnimGraphNodeCategory(
-        "ANIMGRAPH_MATH",
-        "Math",
+        "ANIMGRAPH_ADAPT",
+        "Adapter",
         items=[
-            NodeItem(IntMath.bl_idname),
-            NodeItem(FloatMath.bl_idname),
-            NodeItem(VectorMath.bl_idname),
             NodeItem(CombineXYZ.bl_idname),
             NodeItem(SeparateXYZ.bl_idname),
-            NodeItem(MatrixMultiply.bl_idname),
             NodeItem(ComposeMatrix.bl_idname),
             NodeItem(DecomposeMatrix.bl_idname),
+        ],
+    ),
+
+    AnimGraphNodeCategory(
+        "ANIMGRAPH_GROUP",
+        "Group",
+        items=[
+            NodeItem(AnimGroupNode.bl_idname),
+            NodeItem(bpy.types.NodeGroupInput.bl_idname),
+            NodeItem(bpy.types.NodeGroupOutput.bl_idname),
         ],
     ),
 ]
 
 
 _CLASSES = (
-    NodeSocketBone,
     DefineBoneNode,
     AnimGroupNode,
-    AnimGroupInputNode,
-    AnimGroupOutputNode,
+    # AnimGroupInputNode,
+    # AnimGroupOutputNode,
     DefineBoneTransform,
     ReadBoneTransform,
 
