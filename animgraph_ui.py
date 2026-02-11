@@ -2,10 +2,9 @@
 import bpy
 
 from .Core.node_tree import AnimNodeTree
-from .UI import interface_manage, group_operator
+from .UI import group_operator
 
 _MODULES = [
-    # interface_manage, # TODO
     group_operator,
 ]
 

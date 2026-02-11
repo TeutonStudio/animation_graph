@@ -4,8 +4,8 @@ import bpy
 from bpy.types import NodeTree, Node, NodeSocket, FunctionNodeIntegerMath
 from bpy.props import FloatProperty, EnumProperty, FloatVectorProperty, StringProperty, PointerProperty
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
+from .Nodes import mathe_nodes
 from .Nodes.group_nodes import AnimNodeGroup
-from .Nodes.mathe_nodes import IntConst, FloatConst, VectorConst, MatrixConst, IntMath, FloatMath, VectorMath, CombineXYZ, SeparateXYZ, MatrixMultiply, ComposeMatrix, DecomposeMatrix
 from .Nodes.bone_node import DefineBoneNode
 from .Nodes.bone_transform_nodes import DefineBoneTransform, ReadBoneTransform
 
@@ -16,10 +16,12 @@ from .Nodes.bone_transform_nodes import DefineBoneTransform, ReadBoneTransform
 
 
 def register():
+    mathe_nodes.register()
     for c in _CLASSES: bpy.utils.register_class(c)
     register_node_categories(_NODE_CATS_ID, _NODE_CATEGORIES)
 
 def unregister():
+    mathe_nodes.unregister()
     try: unregister_node_categories(_NODE_CATS_ID)
     except Exception: pass
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
@@ -35,9 +37,9 @@ _NODE_CATEGORIES = [
         "ANIMGRAPH_RIGGRAPH",
         "RigGraph",
         items=[
-            NodeItem(DefineBoneNode.bl_idname),
-            NodeItem(DefineBoneTransform.bl_idname),
-            NodeItem(ReadBoneTransform.bl_idname),
+            NodeItem("DefineBoneNode"),
+            NodeItem("DefineBoneTransform"),
+            NodeItem("ReadBoneTransform"),
         ],
     ),
 
@@ -45,10 +47,10 @@ _NODE_CATEGORIES = [
         "ANIMGRAPH_INPUT_CONSTANT",
         "Input: Constant",
         items=[
-            NodeItem(IntConst.bl_idname),
-            NodeItem(FloatConst.bl_idname),
-            NodeItem(VectorConst.bl_idname),
-            NodeItem(MatrixConst.bl_idname),
+            NodeItem("IntConst"),
+            NodeItem("FloatConst"),
+            NodeItem("VectorConst"),
+            NodeItem("MatrixConst"),
         ],
     ),
 
@@ -56,10 +58,10 @@ _NODE_CATEGORIES = [
         "ANIMGRAPH_UTILITY_MATH",
         "Utility: Math",
         items=[
-            NodeItem(IntMath.bl_idname),
-            NodeItem(FloatMath.bl_idname),
-            NodeItem(VectorMath.bl_idname),
-            NodeItem(MatrixMultiply.bl_idname),
+            NodeItem("IntMath"),
+            NodeItem("FloatMath"),
+            NodeItem("VectorMath"),
+            NodeItem("MatrixMultiply"),
         ],
     ),
 
@@ -67,10 +69,10 @@ _NODE_CATEGORIES = [
         "ANIMGRAPH_ADAPT",
         "Adapter",
         items=[
-            NodeItem(CombineXYZ.bl_idname),
-            NodeItem(SeparateXYZ.bl_idname),
-            NodeItem(ComposeMatrix.bl_idname),
-            NodeItem(DecomposeMatrix.bl_idname),
+            NodeItem("CombineXYZ"),
+            NodeItem("SeparateXYZ"),
+            NodeItem("ComposeMatrix"),
+            NodeItem("DecomposeMatrix"),
         ],
     ),
 
@@ -78,7 +80,7 @@ _NODE_CATEGORIES = [
         "ANIMGRAPH_GROUP",
         "Group",
         items=[
-            NodeItem(AnimNodeGroup.bl_idname),
+            NodeItem("AnimNodeGroup"),
             NodeItem("NodeGroupInput"),
             NodeItem("NodeGroupOutput"),
         ],
@@ -92,9 +94,4 @@ _CLASSES = (
     DefineBoneNode,
     DefineBoneTransform,
     ReadBoneTransform,
-
-    IntConst, FloatConst, VectorConst, MatrixConst,
-    IntMath, FloatMath, VectorMath,
-    CombineXYZ, SeparateXYZ,
-    MatrixMultiply, ComposeMatrix, DecomposeMatrix,
 )

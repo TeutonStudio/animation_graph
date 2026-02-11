@@ -95,7 +95,31 @@ def _on_frame_change(scene, depsgraph):
     if _RUNNING:
         return
 
+    _RUNNING = True@persistent
+def _on_frame_change(scene, depsgraph):
+    global _RUNNING
+    if _RUNNING:
+        return
+
     _RUNNING = True
+    try:
+        # Per-frame cache reset
+        _EVAL_CACHE.clear()
+
+        ctx = AnimGraphEvalContext(_EVAL_CACHE, _POSE_CACHE)
+
+        for tree in _iter_animtrees():
+            _evaluate_tree(tree, scene, ctx)
+
+        # Update once per armature, not per node
+        for arm_ob in ctx.touched_armatures:
+            try:
+                arm_ob.update_tag(refresh={"DATA"})
+            except Exception:
+                pass
+
+    finally:
+        _RUNNING = False
     try:
         _EVAL_CACHE.clear()
 
