@@ -61,7 +61,7 @@ _NODE_CATEGORIES = [
             NodeItem("IntMath"),
             NodeItem("FloatMath"),
             NodeItem("VectorMath"),
-            NodeItem("MatrixMultiply"),
+            NodeItem("MatrixMath"),
         ],
     ),
 
