@@ -22,18 +22,19 @@ _EVAL_CACHE = set()
 class AnimGraphEvalContext:
     """
     Shared context passed into node.evaluate(...)
-
-    Required by our node implementations:
-      - eval_cache: set
-      - pose_cache: dict
-      - touched_armatures: set
     """
-    __slots__ = ("eval_cache", "pose_cache", "touched_armatures")
+    __slots__ = ("eval_cache", "pose_cache", "touched_armatures", "values", "eval_stack")
 
     def __init__(self, eval_cache, pose_cache):
         self.eval_cache = eval_cache
         self.pose_cache = pose_cache
         self.touched_armatures = set()
+
+        # per-frame runtime channel (Outputs der Nodes)
+        self.values = {}
+
+        # recursion / cycle guard for eval_socket()
+        self.eval_stack = set()
 
 
 # --------------------------------------------------------------------
@@ -96,15 +97,14 @@ def _on_frame_change(scene, depsgraph):
 
     _RUNNING = True
     try:
-        # Per-frame cache reset
         _EVAL_CACHE.clear()
 
+        # ctx.values und ctx.eval_stack werden im __init__ neu angelegt
         ctx = AnimGraphEvalContext(_EVAL_CACHE, _POSE_CACHE)
 
         for tree in _iter_animtrees():
             _evaluate_tree(tree, scene, ctx)
 
-        # Update once per armature, not per node
         for arm_ob in ctx.touched_armatures:
             try:
                 arm_ob.update_tag(refresh={"DATA"})
@@ -113,6 +113,7 @@ def _on_frame_change(scene, depsgraph):
 
     finally:
         _RUNNING = False
+
 
 
 @persistent
