@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "animgraph"
-version = "0.1.6"
+version = "0.2.0"
 name = "AnimationGraph"
 tagline = "Armature-only node graph for animation composition"
 maintainer = "<TeutonStudios@proton.me>"

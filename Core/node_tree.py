@@ -3,7 +3,17 @@
 import bpy
 
 from . import sockets
-from .helper_methoden import sync_actions_for_tree, _poll_animgraph_tree, _on_action_tree_changed
+from .helper_methoden import (
+    _on_action_tree_changed,
+    _poll_animgraph_tree,
+    find_action_input_slot,
+    initialize_action_tree_binding,
+    interface_socket_identifier,
+    interface_socket_type,
+    iter_interface_sockets,
+    socket_kind,
+    sync_actions_for_tree,
+)
 
 def register(): 
     for c in _CLASSES: bpy.utils.register_class(c)
