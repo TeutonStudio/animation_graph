@@ -20,7 +20,6 @@ class ANIMGRAPH_OT_enter_group(Operator):
     """Enter AnimGraph group tree and update breadcrumbs."""
     bl_idname = "animgraph.enter_group"
     bl_label = "Enter AnimGraph Group"
-    # bl_options = {'REGISTER', 'UNDO'}
 
     node_name: bpy.props.StringProperty()
 
@@ -35,13 +34,8 @@ class ANIMGRAPH_OT_enter_group(Operator):
 
         subgroup = node.node_tree
 
-        # Root setzen, falls Path leer ist (oder inkonsistent)
-        if len(space.path) == 0: space.path.start(tree)   # Root = aktueller Tree
-
-        # In die Gruppe navigieren (Breadcrumb erzeugt)
+        if len(space.path) == 0: space.path.start(tree) 
         space.path.append(subgroup, node=node)
-
-        # Editor auf Subtree schalten
         space.node_tree = subgroup
 
         return {'FINISHED'}
