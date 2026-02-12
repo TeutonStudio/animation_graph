@@ -11,10 +11,10 @@ bl_info = {
 import importlib
 import bpy
 
-from .Core import node_tree
+from .Core import node_tree, action_editor
 from . import animgraph_eval, animgraph_nodes, animgraph_ui
 
-_modules = (node_tree, animgraph_nodes, animgraph_ui, animgraph_eval)
+_modules = (node_tree, action_editor, animgraph_nodes, animgraph_ui, animgraph_eval)
 
 def register():
     for m in _modules: importlib.reload(m).register()

@@ -1,7 +1,5 @@
 # animation_graph/Core/node_tree.py
 
-import re
-
 import bpy
 
 from . import sockets

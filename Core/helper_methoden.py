@@ -1,7 +1,10 @@
 # animation_graph/Core/helper_methoden.py
 
 from mathutils import Quaternion
+import re
 import bpy
+
+from . import sockets
 
 _TIMEKEY_CHANNEL_PATH = '["animgraph_time"]'
 _LEGACY_TIMEKEY_CHANNEL_PATHS = ('["timeKeys"]', '["time_keys"]')
