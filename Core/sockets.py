@@ -104,24 +104,32 @@ class NodeSocketBone(bpy.types.NodeSocket):
         return (0.8, 0.7, 0.2, 1.0)
 
 
-_SOCKET_INT = {"NodeSocketInt"}
-_SOCKET_FLOAT = {"NodeSocketFloat"}
-_SOCKET_VECTOR = {"NodeSocketVector"}
-_SOCKET_VECTORXYZ = {"NodeSocketVectorXYZ"}
-_SOCKET_ROTATION = {"NodeSocketRotation"}
-_SOCKET_TRANSLATION = {"NodeSocketVectorTranslation"}
+_S_INT = "NodeSocketInt"
+_S_FLOAT = "NodeSocketFloat"
+_S_VECTOR = "NodeSocketVector"
+_S_VECTORXYZ = "NodeSocketVectorXYZ"
+_S_ROTATION = "NodeSocketRotation"
+_S_TRANSLATION = "NodeSocketVectorTranslation"
+_S_MATRIX = "NodeSocketMatrix"
+_S_BONE = "NodeSocketBone"
+_SOCKET_INT = {_S_INT}
+_SOCKET_FLOAT = {_S_FLOAT}
+_SOCKET_VECTOR = {_S_VECTOR}
+_SOCKET_VECTORXYZ = {_S_VECTORXYZ}
+_SOCKET_ROTATION = {_S_ROTATION}
+_SOCKET_TRANSLATION = {_S_TRANSLATION}
 _SOCKET_VECTORS = _SOCKET_VECTOR | _SOCKET_VECTORXYZ | _SOCKET_ROTATION | _SOCKET_TRANSLATION
-_SOCKET_MATRIX = {"NodeSocketMatrix"}
-_SOCKET_BONE = {"NodeSocketBone"}
+_SOCKET_MATRIX = {_S_MATRIX}
+_SOCKET_BONE = {_S_BONE}
 validLinks = {
-    "NodeSocketBone":_SOCKET_BONE,
-    "NodeSocketInt":_SOCKET_INT,
-    "NodeSocketFloat":_SOCKET_FLOAT | _SOCKET_INT,
-    "NodeSocketVectorXYZ":_SOCKET_VECTORXYZ | _SOCKET_VECTOR,
-    "NodeSocketRotation":_SOCKET_ROTATION | _SOCKET_VECTOR,
-    "NodeSocketVectorTranslation":_SOCKET_TRANSLATION | _SOCKET_VECTOR,
-    "NodeSocketVector":_SOCKET_VECTORS,
-    "NodeSocketMatrix":_SOCKET_MATRIX,
+    _S_INT:         _SOCKET_INT,
+    _S_FLOAT:       _SOCKET_FLOAT | _SOCKET_INT,
+    _S_VECTOR:      _SOCKET_VECTORS,
+    _S_VECTORXYZ:   _SOCKET_VECTORXYZ | _SOCKET_VECTOR,
+    _S_ROTATION:    _SOCKET_ROTATION | _SOCKET_VECTOR,
+    _S_TRANSLATION: _SOCKET_TRANSLATION | _SOCKET_VECTOR,
+    _S_MATRIX:      _SOCKET_MATRIX,
+    _S_BONE:        _SOCKET_BONE,
 }
 def isValidLink(l: bpy.types.NodeLink) -> bool:
     vn = l.from_socket.bl_idname
