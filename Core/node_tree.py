@@ -19,6 +19,18 @@ class AnimNodeTree(bpy.types.NodeTree):
     bl_description = "Wird verwendet um eine Amatur Pose abhängig vom Zeitpunkt zu definieren"
     bl_use_group_interface = True
 
+    def update(self):
+        # RigInput Node-Ausgänge aktualisieren (optional)
+        for n in getattr(self, "nodes", []): self.update_node(n)
+        for l in getattr(self, "links", []): self.update_link(l)
+
+    def update_node(self,n: bpy.types.Node): pass
+
+    def update_link(self,l: bpy.types.NodeLink): 
+        if not sockets.isValidLink(l):
+            try: self.links.remove(l)
+            except RuntimeError: pass
+
     def interface_update(self, context):
         # 1) IO-Nodes im *gleichen* Tree (das ist der Tree dessen Interface gerade geändert wurde)
         for n in getattr(self, "nodes", []):
@@ -47,21 +59,6 @@ class AnimNodeTree(bpy.types.NodeTree):
                 try: parent.update_tag()   # UI/Depsgraph refresh
                 except Exception: pass
 
-
-    def update(self):
-        # Tree dirty markieren -> depsgraph handler bakes etc.
-        self.dirty = True
-
-        # RigInput Node-Ausgänge aktualisieren (optional)
-        for n in getattr(self, "nodes", []): self.update_node(n)
-        for l in getattr(self, "links", []): self.update_link(l)
-
-    def update_node(self,n: bpy.types.Node): pass
-
-    def update_link(self,l: bpy.types.NodeLink): 
-        if not sockets.isValidLink(l):
-            try: self.links.remove(l)
-            except RuntimeError: pass
 
 
 _CLASSES = [
