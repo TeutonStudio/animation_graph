@@ -3,18 +3,10 @@
 import bpy
 
 from .node_tree import AnimNodeTree
-from .helper_methoden import _poll_animgraph_tree, _on_action_tree_changed, _on_action_input_changed, _poll_armature_obj, _enum_slot_bones, _on_slot_armature_changed
+from .helper_methoden import _on_action_input_changed, _poll_armature_obj, _enum_slot_bones, _on_slot_armature_changed
 
 def register(): 
     for c in _CLASSES: bpy.utils.register_class(c)
-
-    bpy.types.Action.animgraph_tree = bpy.props.PointerProperty(
-        name="Animation Graph",
-        description="AnimGraph node tree used when this Action is active",
-        type=AnimNodeTree,
-        poll=_poll_animgraph_tree,
-        update=_on_action_tree_changed,
-    )
     bpy.types.Action.animgraph_input_values = bpy.props.CollectionProperty(
         name="AnimGraph Inputs",
         type=AnimGraphActionInputValue,
@@ -23,8 +15,6 @@ def unregister():
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
     if hasattr(bpy.types.Action, "animgraph_input_values"):
         del bpy.types.Action.animgraph_input_values
-    if hasattr(bpy.types.Action, "animgraph_tree"):
-        del bpy.types.Action.animgraph_tree
 
 
 

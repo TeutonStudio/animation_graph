@@ -2,12 +2,7 @@
 
 import bpy
 from bpy.app.handlers import persistent, frame_change_post, depsgraph_update_post
-from .Core.node_tree import (
-    build_action_input_value_map,
-    sync_action_inputs,
-    sync_tree_from_action_timekeys,
-    sync_action_timekeys_from_tree,
-)
+from .Core.helper_methoden import build_action_input_value_map, sync_action_inputs, sync_tree_from_action_timekeys, sync_action_timekeys_from_tree
 
 
 _RUNNING = False

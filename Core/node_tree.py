@@ -3,12 +3,21 @@
 import bpy
 
 from . import sockets
-from .helper_methoden import sync_actions_for_tree
+from .helper_methoden import sync_actions_for_tree, _poll_animgraph_tree, _on_action_tree_changed
 
 def register(): 
     for c in _CLASSES: bpy.utils.register_class(c)
+    bpy.types.Action.animgraph_tree = bpy.props.PointerProperty(
+        name="Animation Graph",
+        description="AnimGraph node tree used when this Action is active",
+        type=AnimNodeTree,
+        poll=_poll_animgraph_tree,
+        update=_on_action_tree_changed,
+    )
 def unregister(): 
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
+    if hasattr(bpy.types.Action, "animgraph_tree"):
+        del bpy.types.Action.animgraph_tree
 
 class AnimNodeTree(bpy.types.NodeTree):
     """AnimGraph node tree."""
