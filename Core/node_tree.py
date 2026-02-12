@@ -28,7 +28,6 @@ _TIMEKEY_PROP_NAMES = (
     "timeKeys",
     "time_keys",
     "timekeys",
-    "animgraph_time",
 )
 
 
@@ -61,7 +60,7 @@ def _on_action_tree_changed(self, context):
         return
 
     sync_action_inputs(self, tree)
-    _import_tree_from_action_timekeys(self, tree)
+    _import_tree_from_action_timekeys(self, tree, context)
     sync_action_timekeys_from_tree(self, tree)
     _set_action_timekey_editable(self, False)
 
@@ -314,6 +313,46 @@ def _append_frame_value(out_set, value):
         pass
 
 
+def _extract_numeric_tokens(text):
+    if text is None:
+        return []
+    return re.findall(r"-?\d+(?:\.\d+)?", str(text))
+
+
+def _read_action_property_value(action, prop_name):
+    val = None
+    try:
+        if prop_name in action:
+            val = action[prop_name]
+    except Exception:
+        pass
+
+    if val is None:
+        try:
+            val = getattr(action, prop_name, None)
+        except Exception:
+            val = None
+    return val
+
+
+def _mapping_items(value):
+    if isinstance(value, dict):
+        return list(value.items())
+
+    try:
+        keys = list(value.keys())
+    except Exception:
+        return None
+
+    out = []
+    for key in keys:
+        try:
+            out.append((key, value[key]))
+        except Exception:
+            pass
+    return out
+
+
 def _collect_frames_from_any(out_set, value):
     if value is None:
         return
@@ -326,16 +365,18 @@ def _collect_frames_from_any(out_set, value):
         text = value.strip()
         if not text:
             return
-        for tok in re.findall(r"-?\d+(?:\.\d+)?", text):
+        for tok in _extract_numeric_tokens(text):
             if not tok:
                 continue
             _append_frame_value(out_set, tok)
         return
 
-    if isinstance(value, dict):
+    items = _mapping_items(value)
+    if items is not None:
+        lower = {str(k).lower(): v for k, v in items}
         for key in ("frames", "keys", "timeKeys", "time_keys", "times", "values"):
-            if key in value:
-                _collect_frames_from_any(out_set, value.get(key))
+            if key.lower() in lower:
+                _collect_frames_from_any(out_set, lower.get(key.lower()))
         return
 
     if isinstance(value, (list, tuple, set)):
@@ -360,21 +401,184 @@ def _collect_frames_from_any(out_set, value):
         _collect_frames_from_any(out_set, item)
 
 
+def _extract_scalar_int(value):
+    if value is None:
+        return None
+    try:
+        return int(round(float(value)))
+    except Exception:
+        pass
+
+    if isinstance(value, str):
+        toks = _extract_numeric_tokens(value)
+        if toks:
+            try:
+                return int(round(float(toks[0])))
+            except Exception:
+                return None
+    return None
+
+
+def _extract_vector3(value):
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        nums = _extract_numeric_tokens(value)
+        if len(nums) < 3:
+            return None
+        try:
+            return (float(nums[0]), float(nums[1]), float(nums[2]))
+        except Exception:
+            return None
+
+    items = _mapping_items(value)
+    if items is not None:
+        lower = {str(k).lower(): v for k, v in items}
+        if all(axis in lower for axis in ("x", "y", "z")):
+            try:
+                return (
+                    float(lower["x"]),
+                    float(lower["y"]),
+                    float(lower["z"]),
+                )
+            except Exception:
+                return None
+        if all(axis in lower for axis in ("0", "1", "2")):
+            try:
+                return (
+                    float(lower["0"]),
+                    float(lower["1"]),
+                    float(lower["2"]),
+                )
+            except Exception:
+                return None
+
+    try:
+        seq = list(value)
+    except Exception:
+        return None
+
+    if len(seq) < 3:
+        return None
+    try:
+        return (float(seq[0]), float(seq[1]), float(seq[2]))
+    except Exception:
+        return None
+
+
+def _extract_timekey_entry_from_mapping(data_items):
+    lower = {str(k).lower(): v for k, v in data_items}
+
+    frame = None
+    for key in ("frame", "time", "key", "start", "start_frame", "keyframe", "key_frame", "frame_index", "frame_idx", "at"):
+        if key in lower:
+            frame = _extract_scalar_int(lower.get(key))
+            if frame is not None:
+                break
+    if frame is None:
+        return None
+
+    entry = {"frame": int(frame)}
+
+    for key in ("bone", "bone_name", "bonename", "bone_ref", "boneref", "boneid", "target_bone", "targetbone", "target"):
+        if key in lower:
+            bone = str(lower.get(key) or "").strip()
+            if bone:
+                entry["bone_name"] = bone
+                break
+
+    for key in ("duration", "length", "len", "dur"):
+        if key in lower:
+            duration = _extract_scalar_int(lower.get(key))
+            if duration is not None:
+                entry["duration"] = max(0, int(duration))
+                break
+
+    for key in ("end", "end_frame", "to", "until"):
+        if key in lower:
+            end_frame = _extract_scalar_int(lower.get(key))
+            if end_frame is not None:
+                entry["end_frame"] = int(end_frame)
+                break
+
+    for key in ("location", "translation", "position", "loc"):
+        if key in lower:
+            vec = _extract_vector3(lower.get(key))
+            if vec is not None:
+                entry["location"] = vec
+                break
+
+    for key in ("rotation", "rotation_euler", "rotation_xyz", "euler", "rot"):
+        if key in lower:
+            vec = _extract_vector3(lower.get(key))
+            if vec is not None:
+                entry["rotation"] = vec
+                break
+
+    for key in ("scale", "scl", "size"):
+        if key in lower:
+            vec = _extract_vector3(lower.get(key))
+            if vec is not None:
+                entry["scale"] = vec
+                break
+
+    return entry
+
+
+def _collect_timekey_entries_from_any(value, out_entries):
+    if value is None:
+        return
+
+    items = _mapping_items(value)
+    if items is not None:
+        entry = _extract_timekey_entry_from_mapping(items)
+        if entry is not None:
+            out_entries.append(entry)
+
+        lower = {str(k).lower(): v for k, v in items}
+        for key in ("keys", "timekeys", "time_keys", "entries", "items", "values"):
+            if key in lower:
+                _collect_timekey_entries_from_any(lower.get(key), out_entries)
+        return
+
+    if isinstance(value, str):
+        return
+
+    try:
+        iterator = iter(value)
+    except Exception:
+        return
+
+    for item in iterator:
+        _collect_timekey_entries_from_any(item, out_entries)
+
+
+def _collect_timekey_entries_from_action_properties(action):
+    entries = []
+
+    for prop_name in _TIMEKEY_PROP_NAMES:
+        _collect_timekey_entries_from_any(_read_action_property_value(action, prop_name), entries)
+
+    try:
+        for key in action.keys():
+            if key in {"_RNA_UI"}:
+                continue
+            low = str(key).lower()
+            if "time" not in low or "key" not in low:
+                continue
+            _collect_timekey_entries_from_any(action[key], entries)
+    except Exception:
+        pass
+
+    return entries
+
+
 def _collect_time_frames_from_action_properties(action):
     frames = set()
 
     for prop_name in _TIMEKEY_PROP_NAMES:
-        val = None
-        try:
-            if prop_name in action:
-                val = action[prop_name]
-        except Exception:
-            pass
-        if val is None:
-            try:
-                val = getattr(action, prop_name, None)
-            except Exception:
-                val = None
+        val = _read_action_property_value(action, prop_name)
         _collect_frames_from_any(frames, val)
 
     try:
@@ -401,6 +605,25 @@ def _collect_action_time_frames(action):
     fcurve, _ = _find_any_timekey_fcurve(action)
     if fcurve is not None:
         frames = _fcurve_key_frames(fcurve)
+        if frames:
+            return frames
+
+    entries = _collect_timekey_entries_from_action_properties(action)
+    if entries:
+        entry_frames = set()
+        for entry in entries:
+            _append_frame_value(entry_frames, entry.get("frame"))
+
+            end_frame = entry.get("end_frame")
+            if end_frame is not None:
+                _append_frame_value(entry_frames, end_frame)
+                continue
+
+            duration = entry.get("duration")
+            if duration is not None:
+                _append_frame_value(entry_frames, int(entry.get("frame", 0)) + int(duration))
+
+        frames = sorted(entry_frames)
         if frames:
             return frames
 
@@ -515,7 +738,13 @@ def _evaluate_bone_target(channels, frame):
     return loc, rot, scale
 
 
-def _find_action_armature(action):
+def _find_action_armature(action, context=None):
+    obj = getattr(context, "object", None) if context else None
+    if obj is not None and getattr(obj, "type", "") == "ARMATURE":
+        ad = getattr(obj, "animation_data", None)
+        if getattr(ad, "action", None) == action:
+            return obj
+
     for obj in bpy.data.objects:
         ad = getattr(obj, "animation_data", None)
         if getattr(ad, "action", None) != action:
@@ -552,51 +781,119 @@ def _link(tree, out_sock, in_sock):
         pass
 
 
-def _import_tree_from_action_timekeys(action, tree):
+def _empty_transform_channels():
+    return {
+        "location": {},
+        "rotation_euler": {},
+        "rotation_quaternion": {},
+        "rotation_axis_angle": {},
+        "scale": {},
+    }
+
+
+def _group_timekey_entries_by_bone(entries):
+    grouped = {}
+
+    for entry in entries:
+        frame = _extract_scalar_int(entry.get("frame"))
+        if frame is None:
+            continue
+
+        bone_name = str(entry.get("bone_name", "") or "").strip()
+        rec = grouped.setdefault(bone_name, {"frames": set(), "entries_by_frame": {}})
+        rec["frames"].add(int(frame))
+        rec["entries_by_frame"].setdefault(int(frame), []).append(entry)
+
+        end_frame = _extract_scalar_int(entry.get("end_frame"))
+        if end_frame is not None:
+            rec["frames"].add(int(end_frame))
+            continue
+
+        duration = _extract_scalar_int(entry.get("duration"))
+        if duration is not None:
+            rec["frames"].add(int(frame) + max(0, int(duration)))
+
+    return grouped
+
+
+def _entry_for_frame(entry_meta, frame):
+    if not entry_meta:
+        return None
+    values = entry_meta.get("entries_by_frame", {}).get(int(frame), [])
+    return values[0] if values else None
+
+
+def _entry_explicit_end(entry, start):
+    if not entry:
+        return None
+
+    end_frame = _extract_scalar_int(entry.get("end_frame"))
+    if end_frame is not None:
+        return max(int(start), int(end_frame))
+
+    duration = _extract_scalar_int(entry.get("duration"))
+    if duration is not None:
+        return int(start) + max(0, int(duration))
+
+    return None
+
+
+def _pick_entry_vector(entry, key):
+    if not entry:
+        return None
+    vec = entry.get(key)
+    if vec is None:
+        return None
+    return _extract_vector3(vec)
+
+
+def _import_tree_from_action_timekeys(action, tree, context=None):
     if action is None or tree is None:
         return
     if _tree_has_user_nodes(tree):
         return
 
     time_frames = _collect_action_time_frames(action)
+    timekey_entries = _collect_timekey_entries_from_action_properties(action)
+    entry_tracks = _group_timekey_entries_by_bone(timekey_entries)
     bones = _collect_bone_fcurves(action)
-    if not bones and not time_frames:
+    if not bones and not time_frames and not entry_tracks:
         return
 
-    arm_obj = _find_action_armature(action)
+    arm_obj = _find_action_armature(action, context=context)
     base_x = -700.0
     base_y = 0.0
     row_step = -260.0
     col_step = 280.0
 
     tracks = []
-    if bones:
-        for bone_name in sorted(bones.keys()):
-            data = bones[bone_name]
-            frames = sorted(set(int(f) for f in data["frames"]))
-            if time_frames:
-                frames = sorted(set(frames) | set(time_frames))
-            if not frames and time_frames:
-                frames = list(time_frames)
-            if not frames:
-                continue
-            tracks.append((bone_name, data, frames))
-    else:
-        tracks.append(
-            (
-                "",
-                {
-                    "location": {},
-                    "rotation_euler": {},
-                    "rotation_quaternion": {},
-                    "rotation_axis_angle": {},
-                    "scale": {},
-                },
-                list(time_frames),
-            )
-        )
+    all_bones = set(bones.keys()) | set(entry_tracks.keys())
+    if not all_bones and time_frames:
+        all_bones.add("")
 
-    for row_idx, (bone_name, data, frames) in enumerate(tracks):
+    use_global_time_frames = not bool(entry_tracks)
+
+    for bone_name in sorted(all_bones):
+        data = bones.get(bone_name)
+        if data is None:
+            data = _empty_transform_channels()
+            data["frames"] = set()
+
+        entry_meta = entry_tracks.get(bone_name)
+        frames = set(int(f) for f in data.get("frames", []))
+
+        if entry_meta is not None:
+            frames |= set(int(f) for f in entry_meta.get("frames", []))
+        elif use_global_time_frames and time_frames:
+            frames |= set(int(f) for f in time_frames)
+
+        frames = sorted(frames)
+        if not frames:
+            continue
+
+        tracks.append((bone_name, data, frames, entry_meta))
+
+    for row_idx, (bone_name, data, frames, entry_meta) in enumerate(tracks):
         if not frames:
             continue
 
@@ -623,10 +920,22 @@ def _import_tree_from_action_timekeys(action, tree):
 
         ranges = []
         if len(frames) == 1:
-            ranges.append((frames[0], frames[0]))
+            start = frames[0]
+            end = start
+            explicit_end = _entry_explicit_end(_entry_for_frame(entry_meta, start), start)
+            if explicit_end is not None:
+                end = explicit_end
+            ranges.append((start, end))
         else:
             for idx in range(len(frames) - 1):
-                ranges.append((frames[idx], frames[idx + 1]))
+                start = frames[idx]
+                end = frames[idx + 1]
+
+                explicit_end = _entry_explicit_end(_entry_for_frame(entry_meta, start), start)
+                if explicit_end is not None:
+                    end = explicit_end
+
+                ranges.append((start, end))
 
         prev_transform = None
         for col_idx, (start, end) in enumerate(ranges):
@@ -646,7 +955,30 @@ def _import_tree_from_action_timekeys(action, tree):
             _set_node_input_default(transform, "Start", int(start))
             _set_node_input_default(transform, "Duration", int(duration))
 
-            loc, rot, scale = _evaluate_bone_target(data, int(end))
+            entry_end = _entry_for_frame(entry_meta, end)
+            entry_start = _entry_for_frame(entry_meta, start)
+
+            loc = _pick_entry_vector(entry_end, "location")
+            if loc is None:
+                loc = _pick_entry_vector(entry_start, "location")
+
+            rot = _pick_entry_vector(entry_end, "rotation")
+            if rot is None:
+                rot = _pick_entry_vector(entry_start, "rotation")
+
+            scale = _pick_entry_vector(entry_end, "scale")
+            if scale is None:
+                scale = _pick_entry_vector(entry_start, "scale")
+
+            if loc is None or rot is None or scale is None:
+                eval_loc, eval_rot, eval_scale = _evaluate_bone_target(data, int(end))
+                if loc is None:
+                    loc = eval_loc
+                if rot is None:
+                    rot = eval_rot
+                if scale is None:
+                    scale = eval_scale
+
             _set_node_input_default(transform, "Translation", loc)
             _set_node_input_default(transform, "Rotation", rot)
             _set_node_input_default(transform, "Scale", scale)
@@ -745,7 +1077,7 @@ def _write_action_timekey_channel(action, frames):
     if action is None:
         return
 
-    fcurve, data_path = _find_any_timekey_fcurve(action)
+    fcurve, _ = _find_any_timekey_fcurve(action)
     wanted = sorted(set(int(f) for f in frames))
 
     if not wanted and fcurve is None:
@@ -757,16 +1089,14 @@ def _write_action_timekey_channel(action, frames):
             return
 
     if wanted:
-        for prop_name in ("animgraph_time", "timeKeys", "time_keys"):
-            try:
-                action[prop_name] = float(wanted[0])
-            except Exception:
-                pass
+        try:
+            action["animgraph_time"] = float(wanted[0])
+        except Exception:
+            pass
 
     if fcurve is None and wanted:
-        data_path = _TIMEKEY_CHANNEL_PATH
         try:
-            fcurve = action.fcurves.new(data_path=data_path, index=0, action_group="AnimGraph")
+            fcurve = action.fcurves.new(data_path=_TIMEKEY_CHANNEL_PATH, index=0, action_group="AnimGraph")
         except Exception:
             fcurve = None
 

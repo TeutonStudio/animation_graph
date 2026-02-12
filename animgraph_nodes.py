@@ -50,6 +50,8 @@ _NODE_CATEGORIES = [
             NodeItem("IntConst"),
             NodeItem("FloatConst"),
             NodeItem("VectorConst"),
+            NodeItem("RotationConst"),
+            NodeItem("TranslationConst"),
             NodeItem("MatrixConst"),
         ],
     ),
