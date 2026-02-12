@@ -2,10 +2,11 @@
 import bpy
 
 from .Core.node_tree import AnimNodeTree
-from .UI import group_operator
+from .UI import group_operator, action_panel
 
 _MODULES = [
     group_operator,
+    action_panel,
 ]
 
 def register(): 
@@ -13,3 +14,4 @@ def register():
     
 def unregister(): 
     for m in reversed(_MODULES): m.unregister()
+

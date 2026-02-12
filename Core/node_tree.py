@@ -7,8 +7,16 @@ from . import sockets
 
 def register(): 
     for c in _CLASSES: bpy.utils.register_class(c)
+
+    bpy.types.Action.animgraph_tree = bpy.props.PointerProperty(
+        name="Animation Graph",
+        description="AnimGraph node tree used when this Action is active",
+        type=AnimNodeTree,
+    )
 def unregister(): 
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
+    if hasattr(bpy.types.Action, "animgraph_tree"):
+        del bpy.types.Action.animgraph_tree
 
 class AnimNodeTree(bpy.types.NodeTree):
     """AnimGraph node tree."""

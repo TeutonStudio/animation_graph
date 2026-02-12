@@ -3,7 +3,6 @@
 import bpy
 from bpy.app.handlers import persistent, frame_change_post, depsgraph_update_post
 
-from .Core.node_tree import AnimNodeTree
 
 _RUNNING = False
 
@@ -58,10 +57,33 @@ def unregister():
 # tree utilities
 # --------------------------------------------------------------------
 
-def _iter_animtrees():
-    for ng in bpy.data.node_groups:
-        if getattr(ng, "bl_idname", "") == AnimNodeTree.bl_idname:
-            yield ng
+# def _iter_animtrees():
+#     for ng in bpy.data.node_groups:
+#         if getattr(ng, "bl_idname", "") == AnimNodeTree.bl_idname:
+#             yield ng
+
+def _iter_active_action_trees(scene):
+    """
+    Yield each AnimGraph tree assigned to an action that is currently active
+    on at least one object in the scene.
+    """
+    seen = set()
+
+    for ob in scene.objects:
+        ad = getattr(ob, "animation_data", None)
+        action = getattr(ad, "action", None) if ad else None
+        tree = getattr(action, "animgraph_tree", None) if action else None
+
+        if not tree or getattr(tree, "bl_idname", "") != "AnimNodeTree":
+            continue
+
+        ptr = tree.as_pointer()
+        if ptr in seen:
+            continue
+
+        seen.add(ptr)
+        yield tree
+
 
 
 def _find_nodes(tree, bl_idname):
@@ -95,12 +117,6 @@ def _on_frame_change(scene, depsgraph):
     if _RUNNING:
         return
 
-    _RUNNING = True@persistent
-def _on_frame_change(scene, depsgraph):
-    global _RUNNING
-    if _RUNNING:
-        return
-
     _RUNNING = True
     try:
         # Per-frame cache reset
@@ -108,7 +124,8 @@ def _on_frame_change(scene, depsgraph):
 
         ctx = AnimGraphEvalContext(_EVAL_CACHE, _POSE_CACHE)
 
-        for tree in _iter_animtrees():
+        # for tree in _iter_animtrees():
+        for tree in _iter_active_action_trees():
             _evaluate_tree(tree, scene, ctx)
 
         # Update once per armature, not per node
@@ -120,23 +137,23 @@ def _on_frame_change(scene, depsgraph):
 
     finally:
         _RUNNING = False
-    try:
-        _EVAL_CACHE.clear()
+    # try:
+    #     _EVAL_CACHE.clear()
 
-        # ctx.values und ctx.eval_stack werden im __init__ neu angelegt
-        ctx = AnimGraphEvalContext(_EVAL_CACHE, _POSE_CACHE)
+    #     # ctx.values und ctx.eval_stack werden im __init__ neu angelegt
+    #     ctx = AnimGraphEvalContext(_EVAL_CACHE, _POSE_CACHE)
 
-        for tree in _iter_animtrees():
-            _evaluate_tree(tree, scene, ctx)
+    #     for tree in _iter_animtrees():
+    #         _evaluate_tree(tree, scene, ctx)
 
-        for arm_ob in ctx.touched_armatures:
-            try:
-                arm_ob.update_tag(refresh={"DATA"})
-            except Exception:
-                pass
+    #     for arm_ob in ctx.touched_armatures:
+    #         try:
+    #             arm_ob.update_tag(refresh={"DATA"})
+    #         except Exception:
+    #             pass
 
-    finally:
-        _RUNNING = False
+    # finally:
+    #     _RUNNING = False
 
 
 
@@ -154,12 +171,13 @@ def _on_depsgraph_update(scene, depsgraph):
                 if space.edit_tree and getattr(space.edit_tree, "bl_idname", "") == "AnimNodeTree":
                     space.overlay.show_context_path = True
 
-    # # Dirty flag handling + optional redraw
+    # Dirty flag handling + optional redraw
     # for tree in _iter_animtrees():
-    #     if getattr(tree, "dirty", False):
-    #         tree.dirty = False
+    for tree in _iter_active_action_trees():
+        if getattr(tree, "dirty", False):
+            tree.dirty = False
 
-    #         if scr:
-    #             for area in scr.areas:
-    #                 if area.type == "VIEW_3D":
-    #                     area.tag_redraw()
+            if scr:
+                for area in scr.areas:
+                    if area.type == "VIEW_3D":
+                        area.tag_redraw()
