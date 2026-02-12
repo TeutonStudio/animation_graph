@@ -63,6 +63,18 @@ class NodeSocketBone(bpy.types.NodeSocket):
         if text:
             layout.label(text=text)
 
+        # Group Input Outputs sollen aus dem Action-Panel kommen und hier nicht manuell gesetzt werden.
+        if self.is_output and getattr(node, "type", "") == "GROUP_INPUT":
+            arm = getattr(self, "armature_obj", None)
+            bone = getattr(self, "bone_name", "") or "(kein Bone)"
+            arm_name = arm.name if arm else "(keine Armature)"
+
+            col = layout.column(align=True)
+            col.enabled = False
+            col.label(text=arm_name)
+            col.label(text=bone)
+            return
+
         # Wenn verbunden: nur anzeigen, nicht editierbar (dein bisheriges Verhalten)
         if self.is_linked and self.links and (not self.is_output):
             from_sock = self.links[0].from_socket
@@ -122,4 +134,3 @@ def isValidLink(l: bpy.types.NodeLink) -> bool:
     vn = l.from_socket.bl_idname
     zn = l.to_socket.bl_idname
     return zn in validLinks[vn] or vn == zn
-

@@ -2,6 +2,7 @@
 
 import bpy
 from bpy.app.handlers import persistent, frame_change_post, depsgraph_update_post
+from .Core.node_tree import build_action_input_value_map, sync_action_inputs
 
 
 _RUNNING = False
@@ -80,12 +81,12 @@ def _iter_active_action_trees(scene):
         if not tree or getattr(tree, "bl_idname", "") != "AnimNodeTree":
             continue
 
-        ptr = tree.as_pointer()
-        if ptr in seen:
+        key = (tree.as_pointer(), action.as_pointer())
+        if key in seen:
             continue
 
-        seen.add(ptr)
-        yield tree
+        seen.add(key)
+        yield tree, action
 
 
 
@@ -93,11 +94,54 @@ def _find_nodes(tree, bl_idname):
     return [n for n in getattr(tree, "nodes", []) if getattr(n, "bl_idname", "") == bl_idname]
 
 
-def _evaluate_tree(tree, scene, ctx):
+def _apply_action_inputs_to_group_inputs(tree, action, ctx=None):
+    if action is None:
+        return
+
+    input_values = build_action_input_value_map(action, tree)
+    if not input_values:
+        return
+
+    for node in getattr(tree, "nodes", []):
+        if getattr(node, "type", "") != "GROUP_INPUT":
+            continue
+
+        for out_sock in getattr(node, "outputs", []):
+            if out_sock.name not in input_values:
+                continue
+
+            value = input_values[out_sock.name]
+            if getattr(out_sock, "bl_idname", "") == "NodeSocketBone":
+                arm_ob = value[0] if isinstance(value, tuple) and len(value) > 0 else None
+                bone_name = value[1] if isinstance(value, tuple) and len(value) > 1 else ""
+                try:
+                    out_sock.armature_obj = arm_ob
+                except Exception:
+                    pass
+                try:
+                    out_sock.bone_name = bone_name or ""
+                except Exception:
+                    pass
+                continue
+
+            # Keep socket UI in sync when possible.
+            if hasattr(out_sock, "default_value"):
+                try:
+                    out_sock.default_value = value
+                except Exception:
+                    pass
+
+            if ctx is not None:
+                ctx.values[(node.as_pointer(), out_sock.name)] = value
+
+
+def _evaluate_tree(tree, action, scene, ctx):
     """
     Kick off evaluation. We only "tick" transform nodes.
     Everything else is pulled via upstream evaluation when sockets are read.
     """
+    _apply_action_inputs_to_group_inputs(tree, action, ctx)
+
     for n in _find_nodes(tree, "DefineBoneTransform"):
         # Preferred path: mixin provides eval_upstream (handles caching)
         if hasattr(n, "eval_upstream"):
@@ -128,8 +172,8 @@ def _on_frame_change(scene, depsgraph=None):
         ctx = AnimGraphEvalContext(_EVAL_CACHE, _POSE_CACHE)
 
         # for tree in _iter_animtrees():
-        for tree in _iter_active_action_trees(scene):
-            _evaluate_tree(tree, scene, ctx)
+        for tree, action in _iter_active_action_trees(scene):
+            _evaluate_tree(tree, action, scene, ctx)
 
         # Update once per armature, not per node
         for arm_ob in ctx.touched_armatures:
@@ -176,7 +220,13 @@ def _on_depsgraph_update(scene, depsgraph=None):
 
     # Dirty flag handling + optional redraw
     # for tree in _iter_animtrees():
-    for tree in _iter_active_action_trees(scene):
+    for tree, action in _iter_active_action_trees(scene):
+        try:
+            sync_action_inputs(action, tree)
+            _apply_action_inputs_to_group_inputs(tree, action, None)
+        except Exception:
+            pass
+
         if getattr(tree, "dirty", False):
             tree.dirty = False
 
