@@ -2,7 +2,11 @@
 
 import bpy
 from bpy.app.handlers import persistent, frame_change_post, depsgraph_update_post
-from .Core.node_tree import build_action_input_value_map, sync_action_inputs
+from .Core.node_tree import (
+    build_action_input_value_map,
+    sync_action_inputs,
+    sync_action_timekeys_from_tree,
+)
 
 
 _RUNNING = False
@@ -223,6 +227,7 @@ def _on_depsgraph_update(scene, depsgraph=None):
     for tree, action in _iter_active_action_trees(scene):
         try:
             sync_action_inputs(action, tree)
+            sync_action_timekeys_from_tree(action, tree)
             _apply_action_inputs_to_group_inputs(tree, action, None)
         except Exception:
             pass

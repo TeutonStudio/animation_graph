@@ -3,11 +3,43 @@
 import bpy
 from ..Core import node_tree
 
+
 def register():
     for c in _CLASSES: bpy.utils.register_class(c)
 
+
 def unregister():
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
+
+
+class ANIMGRAPH_OT_new_action_tree(bpy.types.Operator):
+    bl_idname = "animgraph.new_action_tree"
+    bl_label = "New Animation Graph"
+    bl_description = "Create and assign a new Animation Graph for the active Action"
+
+    @classmethod
+    def poll(cls, context):
+        obj = getattr(context, "object", None)
+        ad = getattr(obj, "animation_data", None) if obj else None
+        return bool(getattr(ad, "action", None))
+
+    def execute(self, context):
+        obj = getattr(context, "object", None)
+        ad = getattr(obj, "animation_data", None) if obj else None
+        action = getattr(ad, "action", None) if ad else None
+        if action is None:
+            return {'CANCELLED'}
+
+        name = f"{action.name}_AnimGraph"
+        try:
+            tree = bpy.data.node_groups.new(name=name, type="AnimNodeTree")
+        except Exception as ex:
+            self.report({'ERROR'}, f"AnimGraph creation failed: {ex}")
+            return {'CANCELLED'}
+
+        action.animgraph_tree = tree
+        return {'FINISHED'}
+
 
 class ANIMGRAPH_PT_action_binding(bpy.types.Panel):
     bl_label = "AnimationNodes"
@@ -27,7 +59,7 @@ class ANIMGRAPH_PT_action_binding(bpy.types.Panel):
         action = obj.animation_data.action
 
         layout.label(text=f"Action: {action.name}")
-        layout.template_ID(action, "animgraph_tree", new="node.new_node_tree")
+        layout.template_ID(action, "animgraph_tree", new="animgraph.new_action_tree")
 
         tree = getattr(action, "animgraph_tree", None)
         if not tree:
@@ -95,5 +127,6 @@ class ANIMGRAPH_PT_action_binding(bpy.types.Panel):
             row.label(text=f"{label} ({slot.socket_type} nicht unterstuetzt)")
 
 _CLASSES = [
+    ANIMGRAPH_OT_new_action_tree,
     ANIMGRAPH_PT_action_binding,
 ]

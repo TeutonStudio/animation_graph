@@ -1,7 +1,10 @@
 # animation_graph/Core/node_tree.py
 
+import re
+
 import bpy
 from bpy.types import NodeGroupInput, NodeGroupOutput
+from mathutils import Quaternion
 
 from . import sockets
 
@@ -15,6 +18,18 @@ _SOCKET_VECTOR = {
 }
 _SOCKET_MATRIX = {"NodeSocketMatrix"}
 _SOCKET_BONE = {"NodeSocketBone"}
+_TIMEKEY_CHANNEL_PATH = '["animgraph_time"]'
+_LEGACY_TIMEKEY_CHANNEL_PATHS = ('["timeKeys"]', '["time_keys"]')
+_ALL_TIMEKEY_CHANNEL_PATHS = (_TIMEKEY_CHANNEL_PATH,) + _LEGACY_TIMEKEY_CHANNEL_PATHS
+_BONE_FCURVE_RE = re.compile(
+    r'^pose\.bones\["(?P<bone>.+)"\]\.(?P<channel>location|rotation_euler|rotation_quaternion|rotation_axis_angle|scale)$'
+)
+_TIMEKEY_PROP_NAMES = (
+    "timeKeys",
+    "time_keys",
+    "timekeys",
+    "animgraph_time",
+)
 
 
 def _on_action_input_changed(self, context):
@@ -30,14 +45,25 @@ def _on_action_input_changed(self, context):
 def _on_action_tree_changed(self, context):
     tree = getattr(self, "animgraph_tree", None)
 
+    if tree and getattr(tree, "bl_idname", "") != "AnimNodeTree":
+        try:
+            self.animgraph_tree = None
+        except Exception:
+            pass
+        return
+
     if not tree:
         try:
             self.animgraph_input_values.clear()
         except Exception:
             pass
+        _set_action_timekey_editable(self, True)
         return
 
     sync_action_inputs(self, tree)
+    _import_tree_from_action_timekeys(self, tree)
+    sync_action_timekeys_from_tree(self, tree)
+    _set_action_timekey_editable(self, False)
 
     try:
         tree.dirty = True
@@ -47,6 +73,10 @@ def _on_action_tree_changed(self, context):
 
 def _poll_armature_obj(self, obj):
     return obj is not None and obj.type == "ARMATURE"
+
+
+def _poll_animgraph_tree(self, tree):
+    return tree is not None and getattr(tree, "bl_idname", "") == "AnimNodeTree"
 
 
 def _enum_slot_bones(self, context):
@@ -259,6 +289,539 @@ def sync_action_inputs(action, tree):
     return iface_inputs
 
 
+def _iter_non_timekey_fcurves(action):
+    for fcurve in getattr(action, "fcurves", []):
+        if getattr(fcurve, "data_path", "") in _ALL_TIMEKEY_CHANNEL_PATHS:
+            continue
+        yield fcurve
+
+
+def _find_any_timekey_fcurve(action):
+    for path in _ALL_TIMEKEY_CHANNEL_PATHS:
+        for fcurve in getattr(action, "fcurves", []):
+            if getattr(fcurve, "data_path", "") != path:
+                continue
+            if int(getattr(fcurve, "array_index", 0)) != 0:
+                continue
+            return fcurve, path
+    return None, None
+
+
+def _append_frame_value(out_set, value):
+    try:
+        out_set.add(int(round(float(value))))
+    except Exception:
+        pass
+
+
+def _collect_frames_from_any(out_set, value):
+    if value is None:
+        return
+
+    if isinstance(value, (int, float)):
+        _append_frame_value(out_set, value)
+        return
+
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return
+        for tok in re.findall(r"-?\d+(?:\.\d+)?", text):
+            if not tok:
+                continue
+            _append_frame_value(out_set, tok)
+        return
+
+    if isinstance(value, dict):
+        for key in ("frames", "keys", "timeKeys", "time_keys", "times", "values"):
+            if key in value:
+                _collect_frames_from_any(out_set, value.get(key))
+        return
+
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            _collect_frames_from_any(out_set, item)
+        return
+
+    for attr in ("frame", "time", "value"):
+        if hasattr(value, attr):
+            try:
+                _collect_frames_from_any(out_set, getattr(value, attr))
+                return
+            except Exception:
+                pass
+
+    try:
+        iterator = iter(value)
+    except Exception:
+        return
+
+    for item in iterator:
+        _collect_frames_from_any(out_set, item)
+
+
+def _collect_time_frames_from_action_properties(action):
+    frames = set()
+
+    for prop_name in _TIMEKEY_PROP_NAMES:
+        val = None
+        try:
+            if prop_name in action:
+                val = action[prop_name]
+        except Exception:
+            pass
+        if val is None:
+            try:
+                val = getattr(action, prop_name, None)
+            except Exception:
+                val = None
+        _collect_frames_from_any(frames, val)
+
+    try:
+        for key in action.keys():
+            if key in {"_RNA_UI"}:
+                continue
+            low = str(key).lower()
+            if "time" not in low or "key" not in low:
+                continue
+            try:
+                _collect_frames_from_any(frames, action[key])
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    for marker in getattr(action, "pose_markers", []):
+        _append_frame_value(frames, getattr(marker, "frame", None))
+
+    return sorted(frames)
+
+
+def _collect_action_time_frames(action):
+    fcurve, _ = _find_any_timekey_fcurve(action)
+    if fcurve is not None:
+        frames = _fcurve_key_frames(fcurve)
+        if frames:
+            return frames
+
+    frames = _collect_time_frames_from_action_properties(action)
+    if frames:
+        return frames
+
+    seen = set()
+    for fcurve in _iter_non_timekey_fcurves(action):
+        for key in getattr(fcurve, "keyframe_points", []):
+            try:
+                seen.add(int(round(float(key.co[0]))))
+            except Exception:
+                pass
+    return sorted(seen)
+
+
+def _collect_bone_fcurves(action):
+    bones = {}
+
+    for fcurve in _iter_non_timekey_fcurves(action):
+        data_path = getattr(fcurve, "data_path", "") or ""
+        match = _BONE_FCURVE_RE.match(data_path)
+        if not match:
+            continue
+
+        bone_name = match.group("bone")
+        channel = match.group("channel")
+        array_idx = int(getattr(fcurve, "array_index", 0))
+
+        entry = bones.setdefault(
+            bone_name,
+            {
+                "frames": set(),
+                "location": {},
+                "rotation_euler": {},
+                "rotation_quaternion": {},
+                "rotation_axis_angle": {},
+                "scale": {},
+            },
+        )
+        entry[channel][array_idx] = fcurve
+
+        for key in getattr(fcurve, "keyframe_points", []):
+            try:
+                entry["frames"].add(int(round(float(key.co[0]))))
+            except Exception:
+                pass
+
+    return bones
+
+
+def _fcurve_eval(fcurve, frame, fallback):
+    if fcurve is None:
+        return fallback
+    try:
+        return float(fcurve.evaluate(float(frame)))
+    except Exception:
+        return fallback
+
+
+def _evaluate_bone_target(channels, frame):
+    loc_curves = channels.get("location", {})
+    rot_euler_curves = channels.get("rotation_euler", {})
+    rot_quat_curves = channels.get("rotation_quaternion", {})
+    rot_axis_angle_curves = channels.get("rotation_axis_angle", {})
+    scale_curves = channels.get("scale", {})
+
+    loc = (
+        _fcurve_eval(loc_curves.get(0), frame, 0.0),
+        _fcurve_eval(loc_curves.get(1), frame, 0.0),
+        _fcurve_eval(loc_curves.get(2), frame, 0.0),
+    )
+
+    scale = (
+        _fcurve_eval(scale_curves.get(0), frame, 1.0),
+        _fcurve_eval(scale_curves.get(1), frame, 1.0),
+        _fcurve_eval(scale_curves.get(2), frame, 1.0),
+    )
+
+    if rot_quat_curves:
+        quat = Quaternion(
+            (
+                _fcurve_eval(rot_quat_curves.get(0), frame, 1.0),
+                _fcurve_eval(rot_quat_curves.get(1), frame, 0.0),
+                _fcurve_eval(rot_quat_curves.get(2), frame, 0.0),
+                _fcurve_eval(rot_quat_curves.get(3), frame, 0.0),
+            )
+        )
+        euler = quat.to_euler("XYZ")
+        rot = (float(euler.x), float(euler.y), float(euler.z))
+    elif rot_axis_angle_curves:
+        angle = _fcurve_eval(rot_axis_angle_curves.get(0), frame, 0.0)
+        axis = (
+            _fcurve_eval(rot_axis_angle_curves.get(1), frame, 1.0),
+            _fcurve_eval(rot_axis_angle_curves.get(2), frame, 0.0),
+            _fcurve_eval(rot_axis_angle_curves.get(3), frame, 0.0),
+        )
+        try:
+            quat = Quaternion(axis, angle)
+            euler = quat.to_euler("XYZ")
+            rot = (float(euler.x), float(euler.y), float(euler.z))
+        except Exception:
+            rot = (0.0, 0.0, 0.0)
+    else:
+        rot = (
+            _fcurve_eval(rot_euler_curves.get(0), frame, 0.0),
+            _fcurve_eval(rot_euler_curves.get(1), frame, 0.0),
+            _fcurve_eval(rot_euler_curves.get(2), frame, 0.0),
+        )
+
+    return loc, rot, scale
+
+
+def _find_action_armature(action):
+    for obj in bpy.data.objects:
+        ad = getattr(obj, "animation_data", None)
+        if getattr(ad, "action", None) != action:
+            continue
+        if getattr(obj, "type", "") == "ARMATURE":
+            return obj
+    return None
+
+
+def _tree_has_user_nodes(tree):
+    for node in getattr(tree, "nodes", []):
+        if getattr(node, "type", "") in {"GROUP_INPUT", "GROUP_OUTPUT"}:
+            continue
+        return True
+    return False
+
+
+def _set_node_input_default(node, socket_name, value):
+    sock = getattr(node, "inputs", {}).get(socket_name) if node else None
+    if sock is None:
+        return
+    try:
+        sock.default_value = value
+    except Exception:
+        pass
+
+
+def _link(tree, out_sock, in_sock):
+    if tree is None or out_sock is None or in_sock is None:
+        return
+    try:
+        tree.links.new(out_sock, in_sock)
+    except Exception:
+        pass
+
+
+def _import_tree_from_action_timekeys(action, tree):
+    if action is None or tree is None:
+        return
+    if _tree_has_user_nodes(tree):
+        return
+
+    time_frames = _collect_action_time_frames(action)
+    bones = _collect_bone_fcurves(action)
+    if not bones and not time_frames:
+        return
+
+    arm_obj = _find_action_armature(action)
+    base_x = -700.0
+    base_y = 0.0
+    row_step = -260.0
+    col_step = 280.0
+
+    tracks = []
+    if bones:
+        for bone_name in sorted(bones.keys()):
+            data = bones[bone_name]
+            frames = sorted(set(int(f) for f in data["frames"]))
+            if time_frames:
+                frames = sorted(set(frames) | set(time_frames))
+            if not frames and time_frames:
+                frames = list(time_frames)
+            if not frames:
+                continue
+            tracks.append((bone_name, data, frames))
+    else:
+        tracks.append(
+            (
+                "",
+                {
+                    "location": {},
+                    "rotation_euler": {},
+                    "rotation_quaternion": {},
+                    "rotation_axis_angle": {},
+                    "scale": {},
+                },
+                list(time_frames),
+            )
+        )
+
+    for row_idx, (bone_name, data, frames) in enumerate(tracks):
+        if not frames:
+            continue
+
+        y = base_y + (row_idx * row_step)
+
+        bone_node = tree.nodes.new("DefineBoneNode")
+        display_name = bone_name or "Unassigned"
+        bone_node.name = f"Bone {display_name}"
+        bone_node.label = display_name
+        bone_node.location = (base_x, y)
+
+        bone_out = bone_node.outputs.get("Bone")
+        if bone_out is not None:
+            if arm_obj is not None:
+                try:
+                    bone_out.armature_obj = arm_obj
+                except Exception:
+                    pass
+            if bone_name:
+                try:
+                    bone_out.bone_name = bone_name
+                except Exception:
+                    pass
+
+        ranges = []
+        if len(frames) == 1:
+            ranges.append((frames[0], frames[0]))
+        else:
+            for idx in range(len(frames) - 1):
+                ranges.append((frames[idx], frames[idx + 1]))
+
+        prev_transform = None
+        for col_idx, (start, end) in enumerate(ranges):
+            transform = tree.nodes.new("DefineBoneTransform")
+            transform_name = display_name
+            transform.name = f"{transform_name} [{start}-{end}]"
+            transform.label = f"{transform_name} {start}->{end}"
+            transform.location = (base_x + col_step + (col_idx * col_step), y)
+
+            try:
+                transform.apply_mode = "TO"
+                transform.interpolation = "LINEAR"
+            except Exception:
+                pass
+
+            duration = max(0, int(end) - int(start))
+            _set_node_input_default(transform, "Start", int(start))
+            _set_node_input_default(transform, "Duration", int(duration))
+
+            loc, rot, scale = _evaluate_bone_target(data, int(end))
+            _set_node_input_default(transform, "Translation", loc)
+            _set_node_input_default(transform, "Rotation", rot)
+            _set_node_input_default(transform, "Scale", scale)
+
+            _link(tree, bone_out, transform.inputs.get("Bone"))
+            if prev_transform is not None:
+                _link(
+                    tree,
+                    prev_transform.outputs.get("End"),
+                    transform.inputs.get("Start"),
+                )
+            prev_transform = transform
+
+
+def _find_timekey_fcurve(action):
+    fcurve, _ = _find_any_timekey_fcurve(action)
+    return fcurve
+
+
+def _fcurve_key_frames(fcurve):
+    out = []
+    for key in getattr(fcurve, "keyframe_points", []):
+        try:
+            out.append(int(round(float(key.co[0]))))
+        except Exception:
+            pass
+    return sorted(set(out))
+
+
+def _resolve_int_input(sock, node_cache, stack):
+    if sock is None:
+        return 0
+
+    if getattr(sock, "is_linked", False) and sock.links:
+        from_sock = sock.links[0].from_socket
+        node = getattr(from_sock, "node", None)
+        if node and getattr(node, "bl_idname", "") == "DefineBoneTransform" and from_sock.name == "End":
+            return _resolve_transform_end(node, node_cache, stack)
+
+        try:
+            return int(round(float(getattr(from_sock, "default_value", 0))))
+        except Exception:
+            return 0
+
+    try:
+        return int(round(float(getattr(sock, "default_value", 0))))
+    except Exception:
+        return 0
+
+
+def _resolve_transform_end(node, node_cache, stack):
+    node_ptr = node.as_pointer()
+    if node_ptr in node_cache:
+        return node_cache[node_ptr]
+    if node_ptr in stack:
+        try:
+            return int(round(float(getattr(node.outputs.get("End"), "default_value", 0))))
+        except Exception:
+            return 0
+
+    stack.add(node_ptr)
+    try:
+        start = _resolve_int_input(node.inputs.get("Start"), node_cache, stack)
+        duration = _resolve_int_input(node.inputs.get("Duration"), node_cache, stack)
+        end_value = int(start + max(0, duration))
+    finally:
+        stack.discard(node_ptr)
+
+    node_cache[node_ptr] = end_value
+    return end_value
+
+
+def collect_tree_timekeys(tree):
+    if tree is None:
+        return []
+
+    keys = set()
+    node_cache = {}
+    stack = set()
+
+    for node in getattr(tree, "nodes", []):
+        if getattr(node, "bl_idname", "") != "DefineBoneTransform":
+            continue
+
+        start = _resolve_int_input(node.inputs.get("Start"), node_cache, stack)
+        duration = _resolve_int_input(node.inputs.get("Duration"), node_cache, stack)
+        end_value = int(start + max(0, duration))
+
+        keys.add(int(start))
+        keys.add(int(end_value))
+
+    return sorted(keys)
+
+
+def _write_action_timekey_channel(action, frames):
+    if action is None:
+        return
+
+    fcurve, data_path = _find_any_timekey_fcurve(action)
+    wanted = sorted(set(int(f) for f in frames))
+
+    if not wanted and fcurve is None:
+        return
+
+    if fcurve is not None:
+        current = _fcurve_key_frames(fcurve)
+        if current == wanted:
+            return
+
+    if wanted:
+        for prop_name in ("animgraph_time", "timeKeys", "time_keys"):
+            try:
+                action[prop_name] = float(wanted[0])
+            except Exception:
+                pass
+
+    if fcurve is None and wanted:
+        data_path = _TIMEKEY_CHANNEL_PATH
+        try:
+            fcurve = action.fcurves.new(data_path=data_path, index=0, action_group="AnimGraph")
+        except Exception:
+            fcurve = None
+
+    if fcurve is None:
+        return
+
+    while len(fcurve.keyframe_points) > 0:
+        try:
+            fcurve.keyframe_points.remove(fcurve.keyframe_points[0], fast=True)
+        except TypeError:
+            fcurve.keyframe_points.remove(fcurve.keyframe_points[0])
+        except Exception:
+            break
+
+    for frame in wanted:
+        try:
+            key = fcurve.keyframe_points.insert(float(frame), 0.0, options={"FAST"})
+        except TypeError:
+            key = fcurve.keyframe_points.insert(float(frame), 0.0)
+        except Exception:
+            continue
+        try:
+            key.interpolation = "CONSTANT"
+        except Exception:
+            pass
+
+    try:
+        fcurve.update()
+    except Exception:
+        pass
+
+
+def _set_action_timekey_editable(action, editable):
+    lock = not bool(editable)
+    for fcurve in getattr(action, "fcurves", []):
+        try:
+            if bool(getattr(fcurve, "lock", False)) != lock:
+                fcurve.lock = lock
+        except Exception:
+            pass
+
+
+def sync_action_timekeys_from_tree(action, tree):
+    if action is None:
+        return
+
+    if tree is None:
+        _set_action_timekey_editable(action, True)
+        return
+
+    frames = collect_tree_timekeys(tree)
+    _write_action_timekey_channel(action, frames)
+    _set_action_timekey_editable(action, False)
+
+
 def sync_actions_for_tree(tree):
     if tree is None:
         return
@@ -267,6 +830,7 @@ def sync_actions_for_tree(tree):
         if getattr(action, "animgraph_tree", None) != tree:
             continue
         sync_action_inputs(action, tree)
+        sync_action_timekeys_from_tree(action, tree)
 
 
 def _slot_runtime_value(slot):
@@ -322,6 +886,7 @@ def register():
         name="Animation Graph",
         description="AnimGraph node tree used when this Action is active",
         type=AnimNodeTree,
+        poll=_poll_animgraph_tree,
         update=_on_action_tree_changed,
     )
     bpy.types.Action.animgraph_input_values = bpy.props.CollectionProperty(
@@ -348,6 +913,10 @@ class AnimNodeTree(bpy.types.NodeTree):
         # RigInput Node-Ausgänge aktualisieren (optional)
         for n in getattr(self, "nodes", []): self.update_node(n)
         for l in getattr(self, "links", []): self.update_link(l)
+        try:
+            sync_actions_for_tree(self)
+        except Exception:
+            pass
 
     def update_node(self,n: bpy.types.Node): pass
 
