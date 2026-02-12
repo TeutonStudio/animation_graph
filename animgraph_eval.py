@@ -67,6 +67,9 @@ def _iter_active_action_trees(scene):
     Yield each AnimGraph tree assigned to an action that is currently active
     on at least one object in the scene.
     """
+    if scene is None:
+        return
+
     seen = set()
 
     for ob in scene.objects:
@@ -112,7 +115,7 @@ def _evaluate_tree(tree, scene, ctx):
 # --------------------------------------------------------------------
 
 @persistent
-def _on_frame_change(scene, depsgraph):
+def _on_frame_change(scene, depsgraph=None):
     global _RUNNING
     if _RUNNING:
         return
@@ -125,7 +128,7 @@ def _on_frame_change(scene, depsgraph):
         ctx = AnimGraphEvalContext(_EVAL_CACHE, _POSE_CACHE)
 
         # for tree in _iter_animtrees():
-        for tree in _iter_active_action_trees():
+        for tree in _iter_active_action_trees(scene):
             _evaluate_tree(tree, scene, ctx)
 
         # Update once per armature, not per node
@@ -158,7 +161,7 @@ def _on_frame_change(scene, depsgraph):
 
 
 @persistent
-def _on_depsgraph_update(scene, depsgraph):
+def _on_depsgraph_update(scene, depsgraph=None):
     if _RUNNING:
         return
 
@@ -173,7 +176,7 @@ def _on_depsgraph_update(scene, depsgraph):
 
     # Dirty flag handling + optional redraw
     # for tree in _iter_animtrees():
-    for tree in _iter_active_action_trees():
+    for tree in _iter_active_action_trees(scene):
         if getattr(tree, "dirty", False):
             tree.dirty = False
 

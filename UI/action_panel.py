@@ -9,7 +9,7 @@ def unregister():
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
 
 class ANIMGRAPH_PT_action_binding(bpy.types.Panel):
-    bl_label = "AnimGraph Action Binding"
+    bl_label = "AnimationNodes"
     bl_space_type = "DOPESHEET_EDITOR"
     bl_region_type = "UI"
     bl_category = "Action"
