@@ -154,12 +154,12 @@ def _on_depsgraph_update(scene, depsgraph):
                 if space.edit_tree and getattr(space.edit_tree, "bl_idname", "") == "AnimNodeTree":
                     space.overlay.show_context_path = True
 
-    # Dirty flag handling + optional redraw
-    for tree in _iter_animtrees():
-        if getattr(tree, "dirty", False):
-            tree.dirty = False
+    # # Dirty flag handling + optional redraw
+    # for tree in _iter_animtrees():
+    #     if getattr(tree, "dirty", False):
+    #         tree.dirty = False
 
-            if scr:
-                for area in scr.areas:
-                    if area.type == "VIEW_3D":
-                        area.tag_redraw()
+    #         if scr:
+    #             for area in scr.areas:
+    #                 if area.type == "VIEW_3D":
+    #                     area.tag_redraw()

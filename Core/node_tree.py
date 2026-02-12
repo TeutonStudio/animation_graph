@@ -19,13 +19,6 @@ class AnimNodeTree(bpy.types.NodeTree):
     bl_description = "Wird verwendet um eine Amatur Pose abhängig vom Zeitpunkt zu definieren"
     bl_use_group_interface = True
 
-    dirty: bpy.props.BoolProperty(
-        name="Dirty",
-        description="Internal flag set when the node tree changed and needs re-evaluation",
-        default=False,
-        options={"HIDDEN"},
-    )
-
     def interface_update(self, context):
         # 1) IO-Nodes im *gleichen* Tree (das ist der Tree dessen Interface gerade geändert wurde)
         for n in getattr(self, "nodes", []):
