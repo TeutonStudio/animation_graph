@@ -103,32 +103,25 @@ class NodeSocketBone(bpy.types.NodeSocket):
     def draw_color(self, context, node):
         return (0.8, 0.7, 0.2, 1.0)
 
+
+_SOCKET_INT = {"NodeSocketInt"}
+_SOCKET_FLOAT = {"NodeSocketFloat"}
+_SOCKET_VECTOR = {"NodeSocketVector"}
+_SOCKET_VECTORXYZ = {"NodeSocketVectorXYZ"}
+_SOCKET_ROTATION = {"NodeSocketRotation"}
+_SOCKET_TRANSLATION = {"NodeSocketVectorTranslation"}
+_SOCKET_VECTORS = _SOCKET_VECTOR | _SOCKET_VECTORXYZ | _SOCKET_ROTATION | _SOCKET_TRANSLATION
+_SOCKET_MATRIX = {"NodeSocketMatrix"}
+_SOCKET_BONE = {"NodeSocketBone"}
 validLinks = {
-    "NodeSocketBone":["NodeSocketBone"],
-    "NodeSocketInt":["NodeSocketInt"],
-    "NodeSocketFloat":[
-        "NodeSocketFloat",
-        "NodeSocketInt",
-    ],
-    "NodeSocketVectorXYZ":[
-        "NodeSocketVectorXYZ",
-        "NodeSocketVector",
-    ],
-    "NodeSocketRotation":[
-        "NodeSocketRotation",
-        "NodeSocketVector",
-    ],
-    "NodeSocketVectorTranslation":[
-        "NodeSocketVectorTranslation",
-        "NodeSocketVector",
-    ],
-    "NodeSocketVector":[
-        "NodeSocketVector",
-        "NodeSocketVectorXYZ",
-        "NodeSocketRotation",
-        "NodeSocketVectorTranslation",
-    ],
-    "NodeSocketMatrix":["NodeSocketMatrix"],
+    "NodeSocketBone":_SOCKET_BONE,
+    "NodeSocketInt":_SOCKET_INT,
+    "NodeSocketFloat":_SOCKET_FLOAT | _SOCKET_INT,
+    "NodeSocketVectorXYZ":_SOCKET_VECTORXYZ | _SOCKET_VECTOR,
+    "NodeSocketRotation":_SOCKET_ROTATION | _SOCKET_VECTOR,
+    "NodeSocketVectorTranslation":_SOCKET_TRANSLATION | _SOCKET_VECTOR,
+    "NodeSocketVector":_SOCKET_VECTORS,
+    "NodeSocketMatrix":_SOCKET_MATRIX,
 }
 def isValidLink(l: bpy.types.NodeLink) -> bool:
     vn = l.from_socket.bl_idname

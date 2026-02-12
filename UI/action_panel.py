@@ -38,6 +38,12 @@ class ANIMGRAPH_OT_new_action_tree(bpy.types.Operator):
             return {'CANCELLED'}
 
         action.animgraph_tree = tree
+        try:
+            # Ensure keyframe import also works when the RNA update callback
+            # is skipped or delayed in this context.
+            node_tree.initialize_action_tree_binding(action, tree, context)
+        except Exception:
+            pass
         return {'FINISHED'}
 
 

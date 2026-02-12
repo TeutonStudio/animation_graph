@@ -8,16 +8,6 @@ from mathutils import Quaternion
 
 from . import sockets
 
-_SOCKET_INT = {"NodeSocketInt"}
-_SOCKET_FLOAT = {"NodeSocketFloat"}
-_SOCKET_VECTOR = {
-    "NodeSocketVector",
-    "NodeSocketVectorXYZ",
-    "NodeSocketRotation",
-    "NodeSocketVectorTranslation",
-}
-_SOCKET_MATRIX = {"NodeSocketMatrix"}
-_SOCKET_BONE = {"NodeSocketBone"}
 _TIMEKEY_CHANNEL_PATH = '["animgraph_time"]'
 _LEGACY_TIMEKEY_CHANNEL_PATHS = ('["timeKeys"]', '["time_keys"]')
 _ALL_TIMEKEY_CHANNEL_PATHS = (_TIMEKEY_CHANNEL_PATH,) + _LEGACY_TIMEKEY_CHANNEL_PATHS
@@ -51,18 +41,25 @@ def _on_action_tree_changed(self, context):
             pass
         return
 
-    if not tree:
-        try:
-            self.animgraph_input_values.clear()
-        except Exception:
-            pass
-        _set_action_timekey_editable(self, True)
+    initialize_action_tree_binding(self, tree, context)
+
+
+def initialize_action_tree_binding(action, tree, context=None):
+    if action is None:
         return
 
-    sync_action_inputs(self, tree)
-    _import_tree_from_action_timekeys(self, tree, context)
-    sync_action_timekeys_from_tree(self, tree)
-    _set_action_timekey_editable(self, False)
+    if not tree:
+        try:
+            action.animgraph_input_values.clear()
+        except Exception:
+            pass
+        _set_action_timekey_editable(action, True)
+        return
+
+    sync_action_inputs(action, tree)
+    _import_tree_from_action_timekeys(action, tree, context)
+    sync_action_timekeys_from_tree(action, tree)
+    _set_action_timekey_editable(action, False)
 
     try:
         tree.dirty = True
@@ -155,15 +152,15 @@ class AnimGraphActionInputValue(bpy.types.PropertyGroup):
 def socket_kind(socket_type):
     socket_type = socket_type or ""
 
-    if socket_type in _SOCKET_BONE or "bone" in socket_type.lower():
+    if socket_type in sockets._SOCKET_BONE or "bone" in socket_type.lower():
         return "BONE"
-    if socket_type in _SOCKET_INT or "int" in socket_type.lower():
+    if socket_type in sockets._SOCKET_INT or "int" in socket_type.lower():
         return "INT"
-    if socket_type in _SOCKET_FLOAT or "float" in socket_type.lower():
+    if socket_type in sockets._SOCKET_FLOAT or "float" in socket_type.lower():
         return "FLOAT"
-    if socket_type in _SOCKET_MATRIX or "matrix" in socket_type.lower():
+    if socket_type in sockets._SOCKET_MATRIX or "matrix" in socket_type.lower():
         return "MATRIX"
-    if socket_type in _SOCKET_VECTOR or any(k in socket_type.lower() for k in ("vector", "rotation", "translation")):
+    if socket_type in sockets._SOCKET_VECTORS or any(k in socket_type.lower() for k in ("vector", "rotation", "translation")):
         return "VECTOR"
     return "UNSUPPORTED"
 
