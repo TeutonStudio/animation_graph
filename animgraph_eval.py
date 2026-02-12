@@ -73,7 +73,7 @@ def _evaluate_tree(tree, scene, ctx):
     Kick off evaluation. We only "tick" transform nodes.
     Everything else is pulled via upstream evaluation when sockets are read.
     """
-    for n in _find_nodes(tree, "ANIMGRAPH_DefineBoneTransform"):
+    for n in _find_nodes(tree, "DefineBoneTransform"):
         # Preferred path: mixin provides eval_upstream (handles caching)
         if hasattr(n, "eval_upstream"):
             n.eval_upstream(tree, scene, ctx)

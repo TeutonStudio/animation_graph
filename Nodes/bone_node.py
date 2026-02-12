@@ -4,13 +4,9 @@ import bpy
 from .Mixin import AnimGraphNodeMixin
 
 class DefineBoneNode(bpy.types.Node, AnimGraphNodeMixin):
-    bl_idname = "BoneName"
+    bl_idname = "DefineBoneNode"
     bl_label = "Bone"
     bl_icon = "BONE_DATA"
 
-    def init(self, context):
-        # Output ist dein Bone-Socket
-        self.outputs.new("NodeSocketBone","Bone")
-
-    def draw_buttons(self, context, layout):
-        pass
+    def init(self, context): self.outputs.new("NodeSocketBone","Bone")
+    def draw_buttons(self, context, layout): pass

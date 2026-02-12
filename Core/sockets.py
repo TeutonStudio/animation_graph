@@ -92,7 +92,7 @@ class NodeSocketBone(bpy.types.NodeSocket):
         return (0.8, 0.7, 0.2, 1.0)
 
 validLinks = {
-    NodeSocketBone.bl_idname:[NodeSocketBone.bl_idname],
+    "NodeSocketBone":["NodeSocketBone"],
     "NodeSocketInt":["NodeSocketInt"],
     "NodeSocketFloat":[
         "NodeSocketFloat",
