@@ -2,6 +2,7 @@
 
 import bpy
 from bpy.types import NodeGroupInput, NodeGroupOutput
+from collections import Counter
 
 from .Mixin import AnimGraphNodeMixin
 
@@ -51,22 +52,99 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
         # bpy.data.node_groups.get(self.node_tree.name) == self.node_tree (sollte)
         # self.node_tree.name == self.name ??
 
-        iface_inputs = []
-        iface_outputs = []
-        for i in self.node_tree.interface.items_tree:
-            if i.item_type == 'SOCKET':
-                liste = iface_inputs.append if i.in_out == 'INPUT' else iface_outputs.append
-                liste(i)
-        
-        self.inputs.clear()
-        self.outputs.clear()
-        for i in iface_inputs: self.inputs.new(i.bl_socket_idname,i.name)
-        for i in iface_outputs: self.outputs.new(i.bl_socket_idname,i.name)
-        # iface_inputs = _iter_interface_sockets(sub, want_in_out="INPUT")
-        # iface_outputs = _iter_interface_sockets(sub, want_in_out="OUTPUT")
+        iface_inputs = _iter_interface_sockets(sub, want_in_out="INPUT")
+        iface_outputs = _iter_interface_sockets(sub, want_in_out="OUTPUT")
 
-        # _sync_node_sockets(self.inputs, iface_inputs)
-        # _sync_node_sockets(self.outputs, iface_outputs)
+        _sync_node_sockets(self.inputs, iface_inputs)
+        _sync_node_sockets(self.outputs, iface_outputs)
+
+
+def _iter_interface_sockets(subtree, want_in_out):
+    iface = getattr(subtree, "interface", None)
+    if iface is None:
+        return []
+
+    sockets = []
+    try:
+        for item in iface.items_tree:
+            if getattr(item, "item_type", None) != "SOCKET":
+                continue
+            if getattr(item, "in_out", None) != want_in_out:
+                continue
+            sockets.append(item)
+    except Exception:
+        return []
+    return sockets
+
+
+def _iface_socket_signature(iface_sock):
+    name = getattr(iface_sock, "name", "") or ""
+    socket_idname = (
+        getattr(iface_sock, "bl_socket_idname", None)
+        or getattr(iface_sock, "socket_type", None)
+        or ""
+    )
+    if not name or not socket_idname:
+        return None
+    return (name, socket_idname)
+
+
+def _node_socket_signature(sock):
+    return (getattr(sock, "name", ""), getattr(sock, "bl_idname", ""))
+
+
+def _sync_node_sockets(node_sockets, iface_sockets):
+    desired = []
+    for iface_sock in iface_sockets:
+        sig = _iface_socket_signature(iface_sock)
+        if sig is not None:
+            desired.append(sig)
+
+    # Remove only stale/mismatched sockets (including duplicates).
+    keep_budget = Counter(desired)
+    to_remove = []
+    for sock in list(node_sockets):
+        sig = _node_socket_signature(sock)
+        if keep_budget.get(sig, 0) > 0:
+            keep_budget[sig] -= 1
+            continue
+        to_remove.append(sock)
+
+    for sock in to_remove:
+        try:
+            node_sockets.remove(sock)
+        except Exception:
+            pass
+
+    # Create only the missing sockets.
+    missing = Counter(desired)
+    for sock in node_sockets:
+        sig = _node_socket_signature(sock)
+        if missing.get(sig, 0) > 0:
+            missing[sig] -= 1
+
+    for (name, socket_idname), count in missing.items():
+        for _ in range(count):
+            try:
+                node_sockets.new(socket_idname, name)
+            except Exception:
+                pass
+
+    # Reorder to match interface order without recreating.
+    for target_idx, wanted_sig in enumerate(desired):
+        found_idx = None
+        for idx, sock in enumerate(node_sockets):
+            if idx < target_idx:
+                continue
+            if _node_socket_signature(sock) == wanted_sig:
+                found_idx = idx
+                break
+        if found_idx is None or found_idx == target_idx:
+            continue
+        try:
+            node_sockets.move(found_idx, target_idx)
+        except Exception:
+            pass
 
 def add_node(tree: bpy.types.NodeTree, node_type: str):
     ctx = bpy.context
