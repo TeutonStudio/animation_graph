@@ -2,26 +2,29 @@
 
 import bpy
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
-from .Nodes import mathe_nodes
+from .Nodes import mathe_nodes, iteration_nodes, bone_transform_nodes
 from .Nodes.group_nodes import AnimNodeGroup
 from .Nodes.bone_node import DefineBoneNode
-from .Nodes.bone_transform_nodes import DefineBoneTransform, ReadBoneTransform
 
 
 # --------------------------------------------------------------------
 # register / unregister
 # --------------------------------------------------------------------
-
+_MODULES = [
+    mathe_nodes,
+    iteration_nodes,
+    bone_transform_nodes,
+]
 
 def register():
-    mathe_nodes.register()
+    for m in _MODULES: bpy.utils.register_class(m)
     for c in _CLASSES: bpy.utils.register_class(c)
     register_node_categories(_NODE_CATS_ID, _NODE_CATEGORIES)
 
 def unregister():
-    mathe_nodes.unregister()
     try: unregister_node_categories(_NODE_CATS_ID)
     except Exception: pass
+    for m in reversed(_MODULES): bpy.utils.unregister_class(m)
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
 
 class AnimGraphNodeCategory(NodeCategory):
@@ -92,6 +95,4 @@ _CLASSES = (
     AnimNodeGroup,
 
     DefineBoneNode,
-    DefineBoneTransform,
-    ReadBoneTransform,
 )

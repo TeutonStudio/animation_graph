@@ -6,64 +6,6 @@ from bpy.types import NodeGroupInput, NodeGroupOutput
 from .Mixin import AnimGraphNodeMixin
 
 
-# def _sync_node_sockets(sock_list, iface_sockets):
-#     want = []
-#     for s in iface_sockets:
-#         socket_type = getattr(s, "socket_type", None) or getattr(s, "bl_socket_idname", None)
-#         ident = getattr(s, "identifier", None) or getattr(s, "name", None)
-#         name  = getattr(s, "name", None)
-#         if socket_type and ident and name:
-#             want.append((ident, socket_type, name))
-
-#     # existing by name (NodeSocket identifier ist nicht sauber setzbar, daher meist über name matchen)
-#     existing = {sock.name: sock for sock in sock_list}
-
-#     # remove sockets not wanted (by name)
-#     want_names = {name for (_, _, name) in want}
-#     for sock in list(sock_list):
-#         if sock.name not in want_names:
-#             try:
-#                 sock_list.remove(sock)
-#             except Exception:
-#                 pass
-
-#     # add missing + ensure type
-#     existing = {sock.name: sock for sock in sock_list}
-#     for ident, socket_type, name in want:
-#         sock = existing.get(name)
-#         if sock is None:
-#             try:
-#                 sock_list.new(socket_type, name)
-#             except Exception:
-#                 pass
-#         else:
-#             # wenn Typ nicht passt: neu erzeugen
-#             if getattr(sock, "bl_idname", None) != socket_type:
-#                 try:
-#                     sock_list.remove(sock)
-#                     sock_list.new(socket_type, name)
-#                 except Exception:
-#                     pass
-
-
-# def _iter_interface_sockets(ntree, want_in_out=None):
-#     iface = getattr(ntree, "interface", None)
-#     if iface is None: return []
-
-#     def walk(items):
-#         for it in items:
-#             # Interface sockets haben in_out + socket_type
-#             if hasattr(it, "in_out") and hasattr(it, "socket_type"):
-#                 if want_in_out is None or it.in_out == want_in_out:
-#                     yield it
-#             child = getattr(it, "items", None)
-#             if child:
-#                 yield from walk(child)
-
-#     try: return list(walk(iface.items_tree))
-#     except Exception: return []
-
-
 class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
     """AnimGraph group instance node."""
 
@@ -126,50 +68,6 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
         # _sync_node_sockets(self.inputs, iface_inputs)
         # _sync_node_sockets(self.outputs, iface_outputs)
 
-
-# class _GroupSocketNode(bpy.types.Node, AnimGraphNodeMixin):
-#     socket_1 = None
-#     socket_2 = None
-
-#     def init(self, context):
-#         self.sync_from_tree_interface()
-
-#     def update(self):
-#         self.sync_from_tree_interface()
-
-#     def sync_from_tree_interface(self):
-#         tree = self.id_data
-#         if not tree or getattr(tree, "bl_idname", None) != "AnimNodeTree":
-#             return
-
-#         iface_sockets = _iter_interface_sockets(tree, want_in_out=self.socket_1)
-
-#         target_list = self.outputs if self.socket_2 == "OUTPUTS" else self.inputs
-
-#         # WICHTIG: auch bei leer -> clear
-#         _sync_node_sockets(target_list, iface_sockets)
-
-
-# class AnimGroupInputNode(_GroupSocketNode, bpy.types.NodeGroupInput):
-#     """Group Input node (interface INPUT → node OUTPUTS)."""
-#     bl_idname = "ANIMGRAPH_GroupInput"
-#     bl_label = "Group Input"
-#     bl_icon = "IMPORT"
-
-#     socket_1 = "INPUT"
-#     socket_2 = "OUTPUTS"
-
-
-# class AnimGroupOutputNode(_GroupSocketNode, bpy.types.NodeGroupOutput):
-#     """Group Output node (interface OUTPUT → node INPUTS)."""
-#     bl_idname = "ANIMGRAPH_GroupOutput"
-#     bl_label = "Group Output"
-#     bl_icon = "EXPORT"
-
-#     socket_1 = "OUTPUT"
-#     socket_2 = "INPUTS"
-
-
 def add_node(tree: bpy.types.NodeTree, node_type: str):
     ctx = bpy.context
 
@@ -201,8 +99,6 @@ def add_node(tree: bpy.types.NodeTree, node_type: str):
             space.node_tree = prev_tree
 
     return False
-
-
 
 def ensure_group_io_nodes(subtree: bpy.types.NodeTree):
     if not subtree or getattr(subtree, "bl_idname", None) != "AnimNodeTree":
@@ -242,4 +138,4 @@ def ensure_group_io_nodes(subtree: bpy.types.NodeTree):
     if n_in is not None: n_in.location = (-300.0, 0.0)
     if n_out is not None: n_out.location = (300.0, 0.0)
 
-
+# TODO evaluation reparieren

@@ -8,6 +8,11 @@ from mathutils import Vector, Euler, Matrix, Quaternion
 from .Mixin import AnimGraphNodeMixin
 
 
+def register():
+    for c in _CLASSES: bpy.utils.register_class(c)
+def unregister():
+    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
+
 # -----------------------------
 # small utilities (module-local)
 # -----------------------------
@@ -461,3 +466,8 @@ class ReadBoneTransform(_BoneTransform):
                 out_r.default_value = (e.x, e.y, e.z)
             except Exception:
                 out_r.default_value = (0.0, 0.0, 0.0)
+
+_CLASSES = [
+    DefineBoneTransform,
+    ReadBoneTransform,
+]
