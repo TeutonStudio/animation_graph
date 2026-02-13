@@ -70,7 +70,7 @@ class AnimNodeTree(bpy.types.NodeTree):
 
             touched = False
             for node in parent.nodes:
-                if node.bl_idname == "AnimGroupNode" and node.node_tree == self:
+                if node.bl_idname == "AnimNodeGroup" and node.node_tree == self:
                     try:
                         node.sync_sockets_from_subtree()
                         touched = True
