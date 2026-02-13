@@ -3,7 +3,7 @@
 import bpy
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
 from .Nodes import mathe_nodes, iteration_nodes, bone_transform_nodes
-from .Nodes.group_nodes import AnimNodeGroup
+from .Nodes.group_node import AnimNodeGroup
 from .Nodes.bone_node import DefineBoneNode
 
 
@@ -93,6 +93,5 @@ _NODE_CATEGORIES = [
 
 _CLASSES = (
     AnimNodeGroup,
-
     DefineBoneNode,
 )
