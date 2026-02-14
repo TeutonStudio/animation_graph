@@ -1,5 +1,6 @@
 # animation_graph/Nodes/bone_node.py
 
+import json
 import bpy
 from bpy.props import EnumProperty
 from .Mixin import AnimGraphNodeMixin
@@ -58,7 +59,23 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
             return "INT"
         if isinstance(value, float):
             return "FLOAT"
-        return None
+        if isinstance(value, str):
+            return "STRING"
+
+        seq = DefineBonePropertieNode._to_sequence(value)
+        if seq is not None:
+            if all(DefineBonePropertieNode._is_number(v) for v in seq):
+                if len(seq) == 3:
+                    return "VECTOR3"
+                if len(seq) == 16:
+                    return "MATRIX16"
+                return "ARRAY_NUMERIC"
+            return "JSON"
+
+        if DefineBonePropertieNode._to_mapping_items(value) is not None:
+            return "JSON"
+
+        return "JSON"
 
     @staticmethod
     def _socket_type_for_kind(kind):
@@ -68,7 +85,89 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
             return "NodeSocketInt"
         if kind == "FLOAT":
             return "NodeSocketFloat"
+        if kind == "STRING":
+            return "NodeSocketString"
+        if kind == "VECTOR3":
+            return "NodeSocketVectorXYZ"
+        if kind == "MATRIX16":
+            return "NodeSocketMatrix"
+        if kind in {"ARRAY_NUMERIC", "JSON"}:
+            return "NodeSocketString"
         return None
+
+    @staticmethod
+    def _is_number(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    @staticmethod
+    def _to_sequence(value):
+        if isinstance(value, (str, bytes, bytearray)):
+            return None
+        if DefineBonePropertieNode._to_mapping_items(value) is not None:
+            return None
+        try:
+            return list(value)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _to_mapping_items(value):
+        try:
+            return list(value.items())
+        except Exception:
+            return None
+
+    @staticmethod
+    def _to_plain_data(value, _depth=0):
+        if _depth > 12:
+            return str(value)
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+
+        items = DefineBonePropertieNode._to_mapping_items(value)
+        if items is not None:
+            out = {}
+            for key, item_value in items:
+                out[str(key)] = DefineBonePropertieNode._to_plain_data(item_value, _depth + 1)
+            return out
+
+        seq = DefineBonePropertieNode._to_sequence(value)
+        if seq is not None:
+            return [DefineBonePropertieNode._to_plain_data(v, _depth + 1) for v in seq]
+
+        return str(value)
+
+    @staticmethod
+    def _json_text(value, fallback=""):
+        try:
+            return json.dumps(DefineBonePropertieNode._to_plain_data(value), ensure_ascii=True)
+        except Exception:
+            try:
+                return str(value)
+            except Exception:
+                return str(fallback)
+
+    @staticmethod
+    def _parse_json_text(value, fallback=None):
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if not text:
+            return fallback
+        try:
+            return json.loads(text)
+        except Exception:
+            return fallback
+
+    @staticmethod
+    def _clone_value(value):
+        if isinstance(value, list):
+            return [DefineBonePropertieNode._clone_value(v) for v in value]
+        if isinstance(value, tuple):
+            return tuple(DefineBonePropertieNode._clone_value(v) for v in value)
+        if isinstance(value, dict):
+            return {k: DefineBonePropertieNode._clone_value(v) for k, v in value.items()}
+        return value
 
     @staticmethod
     def _coerce_bool(value, fallback=False):
@@ -104,6 +203,164 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
         except Exception:
             return float(fallback)
 
+    @staticmethod
+    def _coerce_string(value, fallback=""):
+        if value is None:
+            return str(fallback)
+        try:
+            return str(value)
+        except Exception:
+            return str(fallback)
+
+    @staticmethod
+    def _matrix_identity_flat():
+        return [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ]
+
+    @staticmethod
+    def _matrix4_from_flat(values):
+        flat = list(values) if values is not None else DefineBonePropertieNode._matrix_identity_flat()
+        if len(flat) != 16:
+            flat = DefineBonePropertieNode._matrix_identity_flat()
+        return (
+            (float(flat[0]), float(flat[1]), float(flat[2]), float(flat[3])),
+            (float(flat[4]), float(flat[5]), float(flat[6]), float(flat[7])),
+            (float(flat[8]), float(flat[9]), float(flat[10]), float(flat[11])),
+            (float(flat[12]), float(flat[13]), float(flat[14]), float(flat[15])),
+        )
+
+    @staticmethod
+    def _coerce_vector3(value, fallback=(0.0, 0.0, 0.0)):
+        candidate = DefineBonePropertieNode._parse_json_text(value, fallback=value)
+
+        if hasattr(candidate, "x") and hasattr(candidate, "y") and hasattr(candidate, "z"):
+            try:
+                return [float(candidate.x), float(candidate.y), float(candidate.z)]
+            except Exception:
+                pass
+
+        seq = DefineBonePropertieNode._to_sequence(candidate)
+        if seq is not None and len(seq) >= 3:
+            try:
+                return [float(seq[0]), float(seq[1]), float(seq[2])]
+            except Exception:
+                pass
+
+        fb = DefineBonePropertieNode._to_sequence(fallback)
+        if fb is not None and len(fb) >= 3:
+            try:
+                return [float(fb[0]), float(fb[1]), float(fb[2])]
+            except Exception:
+                pass
+
+        return [0.0, 0.0, 0.0]
+
+    @staticmethod
+    def _coerce_matrix16(value, fallback=None):
+        candidate = DefineBonePropertieNode._parse_json_text(value, fallback=value)
+
+        seq = DefineBonePropertieNode._to_sequence(candidate)
+        if seq is not None:
+            if len(seq) == 16 and all(DefineBonePropertieNode._is_number(v) for v in seq):
+                return [float(v) for v in seq]
+            if len(seq) == 4:
+                rows = []
+                ok = True
+                for row in seq:
+                    rseq = DefineBonePropertieNode._to_sequence(row)
+                    if rseq is None or len(rseq) < 4:
+                        ok = False
+                        break
+                    try:
+                        rows.extend([float(rseq[0]), float(rseq[1]), float(rseq[2]), float(rseq[3])])
+                    except Exception:
+                        ok = False
+                        break
+                if ok and len(rows) == 16:
+                    return rows
+
+        fb = DefineBonePropertieNode._to_sequence(fallback)
+        if fb is not None:
+            if len(fb) == 16 and all(DefineBonePropertieNode._is_number(v) for v in fb):
+                return [float(v) for v in fb]
+            if len(fb) == 4:
+                rows = []
+                ok = True
+                for row in fb:
+                    rseq = DefineBonePropertieNode._to_sequence(row)
+                    if rseq is None or len(rseq) < 4:
+                        ok = False
+                        break
+                    try:
+                        rows.extend([float(rseq[0]), float(rseq[1]), float(rseq[2]), float(rseq[3])])
+                    except Exception:
+                        ok = False
+                        break
+                if ok and len(rows) == 16:
+                    return rows
+
+        return DefineBonePropertieNode._matrix_identity_flat()
+
+    @staticmethod
+    def _coerce_numeric_array(value, fallback):
+        fb_seq = DefineBonePropertieNode._to_sequence(fallback) or []
+
+        candidate = DefineBonePropertieNode._parse_json_text(value, fallback=value)
+        seq = DefineBonePropertieNode._to_sequence(candidate)
+        if seq is None:
+            seq = list(fb_seq)
+
+        if not all(DefineBonePropertieNode._is_number(v) for v in seq):
+            seq = list(fb_seq)
+
+        if fb_seq and len(seq) != len(fb_seq):
+            seq = list(fb_seq)
+
+        all_int = (
+            bool(fb_seq)
+            and all(isinstance(v, int) and not isinstance(v, bool) for v in fb_seq)
+        )
+
+        out = []
+        for v in seq:
+            if all_int:
+                out.append(DefineBonePropertieNode._coerce_int(v, 0))
+            else:
+                out.append(DefineBonePropertieNode._coerce_float(v, 0.0))
+        return out
+
+    @staticmethod
+    def _coerce_json(value, fallback):
+        parsed = DefineBonePropertieNode._parse_json_text(value, fallback=fallback)
+        plain = DefineBonePropertieNode._to_plain_data(parsed)
+        if plain is None:
+            return DefineBonePropertieNode._to_plain_data(fallback)
+        return plain
+
+    @staticmethod
+    def _lerp_numeric_sequence(start_value, target_value, t):
+        sseq = DefineBonePropertieNode._to_sequence(start_value)
+        tseq = DefineBonePropertieNode._to_sequence(target_value)
+        if sseq is None or tseq is None or len(sseq) != len(tseq):
+            return DefineBonePropertieNode._clone_value(target_value if t >= 1.0 else start_value)
+
+        all_int = (
+            all(isinstance(v, int) and not isinstance(v, bool) for v in sseq)
+            and all(isinstance(v, int) and not isinstance(v, bool) for v in tseq)
+        )
+
+        out = []
+        for a, b in zip(sseq, tseq):
+            af = DefineBonePropertieNode._coerce_float(a, 0.0)
+            bf = DefineBonePropertieNode._coerce_float(b, 0.0)
+            v = (1.0 - t) * af + t * bf
+            out.append(int(round(v)) if all_int else float(v))
+        return out
+
     def _property_items(self):
         pbone, _ = self._pose_bone_ref()
         if pbone is None:
@@ -111,7 +368,7 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
 
         specs = self._property_specs()
         if not specs:
-            return [("", "(no bool/int/float properties)", "No compatible bone properties found on this bone.")]
+            return [("", "(no custom properties)", "No custom properties found on this bone.")]
         return [(spec["id"], spec["label"], spec["description"]) for spec in specs]
 
     def _enum_bone_properties(self, context):
@@ -139,8 +396,6 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
                 continue
 
             kind = self._property_kind_from_value(value)
-            if kind is None:
-                continue
 
             specs.append(
                 {
@@ -174,8 +429,6 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
                     continue
 
                 kind = self._property_kind_from_value(value)
-                if kind is None:
-                    continue
 
                 specs.append(
                     {
@@ -258,6 +511,16 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
             return self._coerce_int(value, fallback)
         if kind == "FLOAT":
             return self._coerce_float(value, fallback)
+        if kind == "STRING":
+            return self._coerce_string(value, fallback)
+        if kind == "VECTOR3":
+            return self._coerce_vector3(value, fallback)
+        if kind == "MATRIX16":
+            return self._coerce_matrix16(value, fallback)
+        if kind == "ARRAY_NUMERIC":
+            return self._coerce_numeric_array(value, fallback)
+        if kind == "JSON":
+            return self._coerce_json(value, fallback)
         return fallback
 
     def _ensure_property_selection(self):
@@ -306,6 +569,16 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
                     current_socket.default_value = int(self._coerce_int(prop_value, 0))
                 elif kind == "FLOAT":
                     current_socket.default_value = float(self._coerce_float(prop_value, 0.0))
+                elif kind == "STRING":
+                    current_socket.default_value = self._coerce_string(prop_value, "")
+                elif kind == "VECTOR3":
+                    vec = self._coerce_vector3(prop_value, (0.0, 0.0, 0.0))
+                    current_socket.default_value = (float(vec[0]), float(vec[1]), float(vec[2]))
+                elif kind == "MATRIX16":
+                    mat_flat = self._coerce_matrix16(prop_value, self._matrix_identity_flat())
+                    current_socket.default_value = self._matrix4_from_flat(mat_flat)
+                elif kind in {"ARRAY_NUMERIC", "JSON"}:
+                    current_socket.default_value = self._json_text(prop_value, "[]")
             except Exception:
                 pass
 
@@ -355,7 +628,8 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
 
         prop_id = str(spec.get("id", "") or "")
         kind = str(spec.get("kind", "") or "")
-        if kind not in {"BOOL", "INT", "FLOAT"}: return
+        if not kind:
+            return
 
         start = int(self.socket_int(tree, "Start", scene, ctx, 0))
         duration = int(self.socket_int(tree, "Duration", scene, ctx, 10))
@@ -385,17 +659,18 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
             ctx.pose_cache.pop(cache_key, None)
             return
 
+        current_value = self._coerce_for_kind(prop_current, kind, prop_current)
         value_socket = self.inputs.get("Value")
-        raw_target = self.eval_socket(tree, value_socket, scene, ctx) if value_socket else prop_current
-        target = self._coerce_for_kind(raw_target, kind, prop_current)
+        raw_target = self.eval_socket(tree, value_socket, scene, ctx) if value_socket else current_value
+        target = self._coerce_for_kind(raw_target, kind, current_value)
 
         state = ctx.pose_cache.get(cache_key)
         if state is None:
             state = {
-                "start_value": self._coerce_for_kind(prop_current, kind, prop_current),
+                "start_value": self._clone_value(current_value),
             }
             ctx.pose_cache[cache_key] = state
-        start_value = state.get("start_value", prop_current)
+        start_value = state.get("start_value", current_value)
 
         if duration <= 0:
             t = 1.0
@@ -410,8 +685,16 @@ class DefineBonePropertieNode(bpy.types.Node, AnimGraphNodeMixin):
             value_out = bool(target if t >= 1.0 else start_value)
         elif kind == "INT":
             value_out = int(round((1.0 - t) * int(start_value) + t * int(target)))
-        else:
+        elif kind == "FLOAT":
             value_out = float((1.0 - t) * float(start_value) + t * float(target))
+        elif kind in {"VECTOR3", "MATRIX16", "ARRAY_NUMERIC"}:
+            value_out = self._lerp_numeric_sequence(start_value, target, t)
+            if kind == "VECTOR3":
+                value_out = [float(v) for v in (value_out[:3] if len(value_out) >= 3 else [0.0, 0.0, 0.0])]
+        elif kind in {"STRING", "JSON"}:
+            value_out = self._clone_value(target if t >= 1.0 else start_value)
+        else:
+            value_out = self._clone_value(target if t >= 1.0 else start_value)
 
         try:
             if not self._write_property_value(pbone, spec, value_out): return
