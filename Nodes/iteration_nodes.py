@@ -10,13 +10,10 @@ _MISSING = object()
 
 
 def register():
-    for c in _CLASSES:
-        bpy.utils.register_class(c)
-
+    for c in _CLASSES: bpy.utils.register_class(c)
 
 def unregister():
-    for c in reversed(_CLASSES):
-        bpy.utils.unregister_class(c)
+    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
 
 
 class AnimNodeRepeatInput(bpy.types.Node, AnimGraphNodeMixin):

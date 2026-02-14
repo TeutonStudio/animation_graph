@@ -2,9 +2,43 @@
 
 import bpy
 
+def _enum_bones_from_selected_armature(self, context):
+    """
+    Baut die Bone-Liste dynamisch basierend auf self.armature_obj.
+    Muss eine Liste von (identifier, name, description) liefern.
+    """
+    arm_obj = getattr(self, "armature_obj", None)
+
+    if not arm_obj or arm_obj.type != "ARMATURE" or not arm_obj.data:
+        return [("", "(erst Armature wählen)", "Bitte zuerst eine Armature auswählen.")]
+
+    items = []
+    # arm_obj.data ist bpy.types.Armature, .bones sind Edit/Rest-Bones (nicht PoseBones)
+    for b in arm_obj.data.bones:
+        items.append((b.name, b.name, ""))
+
+    if not items:
+        return [("", "(keine Bones vorhanden)", "Die gewählte Armature hat keine Bones.")]
+    return items
+
+def _on_armature_changed(self, context):
+    """
+    Wenn Armature wechselt: Bone-Auswahl zurücksetzen, falls nicht mehr gültig.
+    """
+    arm_obj = getattr(self, "armature_obj", None)
+    current = getattr(self, "bone_name", "")
+
+    if not arm_obj or arm_obj.type != "ARMATURE" or not arm_obj.data:
+        self.bone_name = ""
+        return
+
+    if current and current not in arm_obj.data.bones:
+        self.bone_name = ""
+
 class NodeSocketBone(bpy.types.NodeSocket):
     bl_idname = "NodeSocketBone"
     bl_label = "Bone"
+    # display_shape = 'SQUARE'
 
     armature_obj: bpy.props.PointerProperty(
         name="Armature",
@@ -65,39 +99,6 @@ class NodeSocketBone(bpy.types.NodeSocket):
     def draw_color(self, context, node):
         return (0.8, 0.7, 0.2, 1.0)
 
-    def _enum_bones_from_selected_armature(self, context):
-        """
-        Baut die Bone-Liste dynamisch basierend auf self.armature_obj.
-        Muss eine Liste von (identifier, name, description) liefern.
-        """
-        arm_obj = getattr(self, "armature_obj", None)
-
-        if not arm_obj or arm_obj.type != "ARMATURE" or not arm_obj.data:
-            return [("", "(erst Armature wählen)", "Bitte zuerst eine Armature auswählen.")]
-
-        items = []
-        # arm_obj.data ist bpy.types.Armature, .bones sind Edit/Rest-Bones (nicht PoseBones)
-        for b in arm_obj.data.bones:
-            items.append((b.name, b.name, ""))
-
-        if not items:
-            return [("", "(keine Bones vorhanden)", "Die gewählte Armature hat keine Bones.")]
-        return items
-
-    def _on_armature_changed(self, context):
-        """
-        Wenn Armature wechselt: Bone-Auswahl zurücksetzen, falls nicht mehr gültig.
-        """
-        arm_obj = getattr(self, "armature_obj", None)
-        current = getattr(self, "bone_name", "")
-
-        if not arm_obj or arm_obj.type != "ARMATURE" or not arm_obj.data:
-            self.bone_name = ""
-            return
-
-        if current and current not in arm_obj.data.bones:
-            self.bone_name = ""
-
 
 _S_INT = "NodeSocketInt"
 _S_FLOAT = "NodeSocketFloat"
@@ -127,6 +128,15 @@ validLinks = {
     _S_BONE:        _SOCKET_BONE,
 }
 def isValidLink(l: bpy.types.NodeLink) -> bool:
-    vn = l.from_socket.bl_idname
-    zn = l.to_socket.bl_idname
-    return zn in validLinks[vn] or vn == zn
+    try:
+        from_sock = l.from_socket
+        to_sock = l.to_socket
+        vn = from_sock.bl_idname
+        zn = to_sock.bl_idname
+    except Exception:
+        return False
+
+    allowed = validLinks.get(vn)
+    if allowed is None:
+        return vn == zn
+    return zn in allowed or vn == zn

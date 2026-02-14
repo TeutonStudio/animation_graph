@@ -6,6 +6,7 @@ from .Core.helper_methoden import build_action_input_value_map, sync_action_inpu
 
 
 _RUNNING = False
+_DEPSGRAPH_SYNC_RUNNING = False
 
 # Persistent pose cache across frames (needed for interpolation / start pose capture)
 # Keying is done by nodes themselves (see DefineBoneTransform / ReadBoneTransform implementations)
@@ -206,33 +207,40 @@ def _on_frame_change(scene, depsgraph=None):
 
 @persistent
 def _on_depsgraph_update(scene, depsgraph=None):
-    if _RUNNING:
+    global _DEPSGRAPH_SYNC_RUNNING
+    if _RUNNING or _DEPSGRAPH_SYNC_RUNNING:
         return
+    _DEPSGRAPH_SYNC_RUNNING = True
 
-    # Keep your UI tweak
-    scr = bpy.context.screen
-    if scr:
-        for area in scr.areas:
-            if area.type == "NODE_EDITOR":
-                space = area.spaces.active
-                if space.edit_tree and getattr(space.edit_tree, "bl_idname", "") == "AnimNodeTree":
-                    space.overlay.show_context_path = True
+    try:
+        # Keep your UI tweak
+        scr = bpy.context.screen
+        if scr:
+            for area in scr.areas:
+                if area.type == "NODE_EDITOR":
+                    space = area.spaces.active
+                    if space.edit_tree and getattr(space.edit_tree, "bl_idname", "") == "AnimNodeTree":
+                        space.overlay.show_context_path = True
 
-    # Dirty flag handling + optional redraw
-    # for tree in _iter_animtrees():
-    for tree, action in _iter_active_action_trees(scene):
-        try:
-            sync_action_inputs(action, tree)
-            sync_tree_from_action_timekeys(action, tree, context=bpy.context)
-            sync_action_timekeys_from_tree(action, tree, context=bpy.context)
-            _apply_action_inputs_to_group_inputs(tree, action, None)
-        except Exception:
-            pass
+        # Dirty flag handling + optional redraw
+        # for tree in _iter_animtrees():
+        for tree, action in _iter_active_action_trees(scene):
+            try:
+                # Keep runtime input mirrors up-to-date.
+                sync_action_inputs(action, tree)
+                _apply_action_inputs_to_group_inputs(tree, action, None)
 
-        if getattr(tree, "dirty", False):
-            tree.dirty = False
+                # Avoid mutating trees/fcurves on every depsgraph tick.
+                if getattr(tree, "dirty", False):
+                    sync_tree_from_action_timekeys(action, tree, context=bpy.context)
+                    sync_action_timekeys_from_tree(action, tree, context=bpy.context)
+                    tree.dirty = False
 
-            if scr:
-                for area in scr.areas:
-                    if area.type == "VIEW_3D":
-                        area.tag_redraw()
+                    if scr:
+                        for area in scr.areas:
+                            if area.type == "VIEW_3D":
+                                area.tag_redraw()
+            except Exception:
+                pass
+    finally:
+        _DEPSGRAPH_SYNC_RUNNING = False

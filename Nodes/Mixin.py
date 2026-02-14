@@ -61,11 +61,21 @@ class AnimGraphNodeMixin:
         key = (tree.as_pointer(), self.as_pointer(), int(scene.frame_current))
         if key in ctx.eval_cache:
             return
+
+        # Protect direct eval_upstream callers that bypass eval_socket guards.
+        guard = ("UPSTREAM_EVAL", tree.as_pointer(), self.as_pointer(), int(scene.frame_current))
+        if guard in ctx.eval_stack:
+            return
+        ctx.eval_stack.add(guard)
+
         ctx.eval_cache.add(key)
 
-        fn = getattr(self, "evaluate", None)
-        if callable(fn):
-            fn(tree, scene, ctx)
+        try:
+            fn = getattr(self, "evaluate", None)
+            if callable(fn):
+                fn(tree, scene, ctx)
+        finally:
+            ctx.eval_stack.discard(guard)
 
     def eval_socket(self, tree, sock, scene, ctx):
         """

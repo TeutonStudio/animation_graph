@@ -6,6 +6,16 @@ from types import SimpleNamespace
 
 from .Mixin import AnimGraphNodeMixin
 
+_SOCKET_SYNC_GUARDS = set()
+_ENSURE_IO_GUARDS = set()
+
+
+def _guard_key(rna):
+    try:
+        return int(rna.as_pointer())
+    except Exception:
+        return id(rna)
+
 
 class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
     """AnimGraph group instance node."""
@@ -27,7 +37,8 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
         self.sync_sockets_from_subtree()
 
     def update(self):
-        if self.node_tree: ensure_group_io_nodes(self.node_tree)
+        if self.node_tree:
+            ensure_group_io_nodes(self.node_tree)
         self.sync_sockets_from_subtree()
 
     def draw_buttons(self, context, layout):
@@ -42,46 +53,64 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
         op.node_name = self.name
 
     def sync_sockets_from_subtree(self):
-        sub = self.node_tree
-
-        if not sub or getattr(sub, "bl_idname", None) != "AnimNodeTree":
-            self.inputs.clear()
-            self.outputs.clear()
+        node_key = _guard_key(self)
+        if node_key in _SOCKET_SYNC_GUARDS:
             return
+        _SOCKET_SYNC_GUARDS.add(node_key)
 
-        # bpy.data.node_groups.get(self.node_tree.name) == self.node_tree (sollte)
-        # self.node_tree.name == self.name ??
+        sub = self.node_tree
+        try:
+            if not sub or getattr(sub, "bl_idname", None) != "AnimNodeTree":
+                self.inputs.clear()
+                self.outputs.clear()
+                return
 
-        iface_inputs = _iter_interface_sockets(sub, want_in_out="INPUT")
-        iface_outputs = _iter_interface_sockets(sub, want_in_out="OUTPUT")
+            iface_inputs = _iter_interface_sockets(sub, want_in_out="INPUT")
+            iface_outputs = _iter_interface_sockets(sub, want_in_out="OUTPUT")
 
-        _sync_node_sockets(self.inputs, iface_inputs)
-        _sync_node_sockets(self.outputs, iface_outputs)
+            _sync_node_sockets(self.inputs, iface_inputs)
+            _sync_node_sockets(self.outputs, iface_outputs)
+        finally:
+            _SOCKET_SYNC_GUARDS.discard(node_key)
 
     def evaluate(self, tree, scene, ctx):
         sub = self.node_tree
         if not sub or getattr(sub, "bl_idname", None) != "AnimNodeTree":
             return
 
-        # Evaluate group contents in an isolated runtime scope so multiple
-        # instances of the same subtree do not share per-frame cache/values.
-        sub_ctx = _make_sub_context(ctx)
+        stack = getattr(ctx, "eval_stack", None)
+        if stack is None:
+            stack = set()
+            ctx.eval_stack = stack
 
-        _push_group_inputs_to_subtree(
-            group_node=self,
-            parent_tree=tree,
-            subtree=sub,
-            scene=scene,
-            parent_ctx=ctx,
-            sub_ctx=sub_ctx,
-        )
-        _pull_group_outputs_from_subtree(
-            group_node=self,
-            subtree=sub,
-            scene=scene,
-            parent_ctx=ctx,
-            sub_ctx=sub_ctx,
-        )
+        # Guard against recursive group re-entry across nested sub-contexts.
+        group_guard = ("GROUP_EVAL", tree.as_pointer(), self.as_pointer(), int(scene.frame_current))
+        if group_guard in stack:
+            return
+        stack.add(group_guard)
+
+        try:
+            # Evaluate group contents in an isolated runtime scope so multiple
+            # instances of the same subtree do not share per-frame cache/values.
+            sub_ctx = _make_sub_context(ctx)
+
+            _push_group_inputs_to_subtree(
+                group_node=self,
+                parent_tree=tree,
+                subtree=sub,
+                scene=scene,
+                parent_ctx=ctx,
+                sub_ctx=sub_ctx,
+            )
+            _pull_group_outputs_from_subtree(
+                group_node=self,
+                subtree=sub,
+                scene=scene,
+                parent_ctx=ctx,
+                sub_ctx=sub_ctx,
+            )
+        finally:
+            stack.discard(group_guard)
 
 
 def _iter_interface_sockets(subtree, want_in_out):
@@ -124,6 +153,10 @@ def _sync_node_sockets(node_sockets, iface_sockets):
         sig = _iface_socket_signature(iface_sock)
         if sig is not None:
             desired.append(sig)
+
+    current = [_node_socket_signature(sock) for sock in node_sockets]
+    if current == desired:
+        return
 
     # Remove only stale/mismatched sockets (including duplicates).
     keep_budget = Counter(desired)
@@ -181,12 +214,17 @@ def _make_sub_context(parent_ctx):
     if touched_armatures is None:
         touched_armatures = set()
 
+    eval_stack = getattr(parent_ctx, "eval_stack", None)
+    if eval_stack is None:
+        eval_stack = set()
+
     return SimpleNamespace(
         eval_cache=set(),
         pose_cache=pose_cache,
         touched_armatures=touched_armatures,
         values={},
-        eval_stack=set(),
+        # Shared stack keeps recursion guards effective across nested groups.
+        eval_stack=eval_stack,
     )
 
 
@@ -294,72 +332,49 @@ def _pull_group_outputs_from_subtree(group_node, subtree, scene, parent_ctx, sub
                 pass
         group_node.set_output_value(parent_ctx, parent_out.name, value)
 
-def add_node(tree: bpy.types.NodeTree, node_type: str):
-    ctx = bpy.context
-
-    win = ctx.window
-    if not win: return False
-
-    scr = win.screen
-    if not scr: return False
-
-    for area in scr.areas:
-        if area.type != 'NODE_EDITOR': continue
-
-        space = area.spaces.active
-        if not space or space.type != 'NODE_EDITOR': continue
-
-        # ganz wichtig: wir müssen den NodeTree setzen, in den wir einfügen wollen
-        prev_tree = space.node_tree
-        space.node_tree = tree
-
-        try:
-            for region in area.regions:
-                if region.type != 'WINDOW': continue
-
-                with ctx.temp_override(window=win, screen=scr, area=area, region=region, space_data=space):
-                    bpy.ops.node.add_node(type=node_type, use_transform=False)
-                return True
-        finally:
-            # restore, sonst “leakst” du UI state
-            space.node_tree = prev_tree
-
-    return False
-
 def ensure_group_io_nodes(subtree: bpy.types.NodeTree):
     if not subtree or getattr(subtree, "bl_idname", None) != "AnimNodeTree":
         return
 
-    # Helper: find existing
-    def find_group_input():
-        for n in subtree.nodes:
-            if getattr(n, "type", None) == "GROUP_INPUT":
-                return n
-        return None
+    tree_key = _guard_key(subtree)
+    if tree_key in _ENSURE_IO_GUARDS:
+        return
+    _ENSURE_IO_GUARDS.add(tree_key)
 
-    def find_group_output():
-        for n in subtree.nodes:
-            if getattr(n, "type", None) == "GROUP_OUTPUT":
-                return n
-        return None
+    try:
+        # Helper: find existing
+        def find_group_input():
+            for n in subtree.nodes:
+                if getattr(n, "type", None) == "GROUP_INPUT":
+                    return n
+            return None
 
-    # 1) ensure input
-    n_in = find_group_input()
-    if n_in is None:
-        before = {n.as_pointer() for n in subtree.nodes}
-        add_node(subtree, "NodeGroupInput")
-        after = [n for n in subtree.nodes if n.as_pointer() not in before]
-        # pick the created one (fallback: first GROUP_INPUT)
-        n_in = next((n for n in after if getattr(n, "type", None) == "GROUP_INPUT"), None) or find_group_input()
+        def find_group_output():
+            for n in subtree.nodes:
+                if getattr(n, "type", None) == "GROUP_OUTPUT":
+                    return n
+            return None
 
-    # 2) ensure output
-    n_out = find_group_output()
-    if n_out is None:
-        before = {n.as_pointer() for n in subtree.nodes}
-        add_node(subtree, "NodeGroupOutput")
-        after = [n for n in subtree.nodes if n.as_pointer() not in before]
-        n_out = next((n for n in after if getattr(n, "type", None) == "GROUP_OUTPUT"), None) or find_group_output()
+        # 1) ensure input
+        n_in = find_group_input()
+        if n_in is None:
+            try:
+                n_in = subtree.nodes.new("NodeGroupInput")
+            except Exception:
+                n_in = find_group_input()
 
-    # 3) position them sensibly
-    if n_in is not None: n_in.location = (-300.0, 0.0)
-    if n_out is not None: n_out.location = (300.0, 0.0)
+        # 2) ensure output
+        n_out = find_group_output()
+        if n_out is None:
+            try:
+                n_out = subtree.nodes.new("NodeGroupOutput")
+            except Exception:
+                n_out = find_group_output()
+
+        # 3) position them sensibly
+        if n_in is not None:
+            n_in.location = (-300.0, 0.0)
+        if n_out is not None:
+            n_out.location = (300.0, 0.0)
+    finally:
+        _ENSURE_IO_GUARDS.discard(tree_key)

@@ -17,14 +17,14 @@ _MODULES = [
 ]
 
 def register():
-    for m in _MODULES: bpy.utils.register_class(m)
+    for m in _MODULES: m.register()
     for c in _CLASSES: bpy.utils.register_class(c)
     register_node_categories(_NODE_CATS_ID, _NODE_CATEGORIES)
 
 def unregister():
     try: unregister_node_categories(_NODE_CATS_ID)
     except Exception: pass
-    for m in reversed(_MODULES): bpy.utils.unregister_class(m)
+    for m in reversed(_MODULES): m.unregister()
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
 
 class AnimGraphNodeCategory(NodeCategory):

@@ -81,9 +81,6 @@ def _on_node_prop_update(self, context):
         nt = getattr(self, "id_data", None)
         if nt:
             nt.update_tag()
-            # some node trees need this to refresh socket UI properly
-            if hasattr(nt, "interface_update"):
-                nt.interface_update(context)
     except Exception:
         pass
 
