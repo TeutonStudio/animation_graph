@@ -1,7 +1,7 @@
 # AnimationGraph
 
-AnimationGraph ist ein Blender-Addon fuer node-basierte Animationslogik auf Armatures.
-Es verknuepft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame aus und schreibt Bone-Transforms sowie Bone-Properties.
+AnimationGraph ist ein Blender-Addon für node-basierte Animationslogik auf Armatures.
+Es verknüpft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame aus und schreibt Bone-Transforms sowie Bone-Properties.
 
 ## Status
 
@@ -12,13 +12,13 @@ Es verknuepft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 ## Features
 
 - Eigener Node-Tree-Typ `AnimNodeTree` (Animation Node Editor).
-- Action-Binding ueber `Action.animgraph_tree`.
+- Action-Binding über `Action.animgraph_tree`.
 - Action-Inputs aus Group-Interface-Sockets im Dopesheet-Panel.
-- Runtime-Evaluation ueber `frame_change_post` und `depsgraph_update_post`.
-- Bone-Socket-Typ `NodeSocketBone` fuer Armature/Bone-Referenzen.
+- Runtime-Evaluation über `frame_change_post` und `depsgraph_update_post`.
+- Bone-Socket-Typ `NodeSocketBone` für Armature/Bone-Referenzen.
 - Bone Transform schreiben/lesen (Components oder Matrix, inklusive Delta-Modus).
 - Bone Property schreiben/lesen (Bool, Int, Float, Vector, Matrix, String, JSON).
-- Math-/Adapter-Nodes fuer Zahlen, Vektoren und Matrizen.
+- Math-/Adapter-Nodes für Zahlen, Vektoren und Matrizen.
 - Group-Node mit Subtree-Interface-Sync.
 - Timekey-Sync zwischen Tree und Action (`animgraph_time`, inkl. Legacy-Keys `timeKeys`/`time_keys`).
 
@@ -27,8 +27,8 @@ Es verknuepft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 ### Option 1: Addon installieren
 
 1. Projektordner zippen (die ZIP muss direkt `__init__.py` enthalten).
-2. In Blender `Edit > Preferences > Add-ons > Install from Disk...` oeffnen.
-3. ZIP auswaehlen und `AnimationGraph` aktivieren.
+2. In Blender `Edit > Preferences > Add-ons > Install from Disk...` öffnen.
+3. ZIP auswählen und `AnimationGraph` aktivieren.
 
 ### Option 2: Entwicklungssetup
 
@@ -37,11 +37,11 @@ Es verknuepft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 
 ## Quickstart
 
-1. Ein Armature-Objekt mit aktiver `Action` auswaehlen.
-2. Im `Dope Sheet` (Action Editor) in der Sidebar das Panel **AnimationNodes** oeffnen.
+1. Ein Armature-Objekt mit aktiver `Action` auswählen.
+2. Im `Dope Sheet` (Action Editor) in der Sidebar das Panel **AnimationNodes** öffnen.
 3. Bei `Animation Graph` auf `New` klicken, um `<ActionName>_AnimGraph` zu erstellen und zuzuweisen.
-4. Im Node Editor den Tree-Typ **Animation Node Editor** waehlen.
-5. Einen Basisgraph bauen, z. B. `Bone` -> `Transform Bone`, dann `Start` und `Duration` setzen.
+4. Im Node Editor den Tree-Typ **Animation Node Editor** wählen.
+5. Einen Basisgraph erzeugen, z. B. `Bone` -> `Transform Bone`, dann `Start` und `Duration` setzen.
 6. Timeline scrubben oder abspielen; der Graph wird pro Frame ausgewertet.
 
 ## Node-Kategorien
@@ -61,12 +61,12 @@ Es verknuepft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 - `Core/node_tree.py`: `AnimNodeTree` und Action-Binding.
 - `Core/sockets.py`: `NodeSocketBone` und Link-Validierung.
 - `Core/helper_methoden.py`: Action-Input-/Timekey-Sync und Import/Export.
-- `Core/action_editor.py`: PropertyGroup fuer Action-Input-Werte.
+- `Core/action_editor.py`: PropertyGroup für Action-Input-Werte.
 - `Nodes/`: Bone-, Transform-, Math-, Group- und Iteration-Nodes.
 - `UI/action_operator.py`: Dopesheet-Panel und Tree-Erstellung.
 - `UI/group_operator.py`: Group-Enter-Operator.
 
-## Aktuelle Einschraenkungen
+## Aktuelle Einschränkungen
 
 - Armature-only Design (kein allgemeiner Object-Graph).
 - Single-Link-Auswertung pro Input (erster Link wird gelesen).
