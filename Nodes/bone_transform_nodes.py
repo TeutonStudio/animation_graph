@@ -344,7 +344,7 @@ class DefineBoneTransformNode(_BoneTransform):
 
 class ReadBoneTransformNode(_BoneTransform):
     bl_idname = "ReadBoneTransformNode"
-    bl_label = "Bone Transform"
+    bl_label = "Read Bone Transform"
 
     def update_representation(self, context): self.update()
     def update_mode(self, context): self.update()

@@ -35,18 +35,17 @@ def _enum_bone_property_items(self, context):
     try: return self._property_items()
     except Exception: return [("", "(select bone first)", "Pick a linked/selected bone first.")]
 
+class _Bone(bpy.types.Node, AnimGraphNodeMixin):
+    bl_icon = "BONE_DATA"
 
-class DefineBoneNode(bpy.types.Node, AnimGraphNodeMixin):
+class DefineBoneNode(_Bone):
     bl_idname = "DefineBoneNode"
     bl_label = "Bone"
-    bl_icon = "BONE_DATA"
 
     def init(self, context): self.outputs.new("NodeSocketBone","Bone")
     def draw_buttons(self, context, layout): pass
 
-class _BoneProperty(bpy.types.Node, AnimGraphNodeMixin):
-    bl_icon = "BONE_DATA"
-
+class _BoneProperty(_Bone):
     property_name: EnumProperty(
         name="Property",
         description="Property on the selected/linked pose bone",
@@ -54,12 +53,10 @@ class _BoneProperty(bpy.types.Node, AnimGraphNodeMixin):
         update=_on_node_prop_update,
     )
     
-    def init(self, context):
-        self.inputs.new("NodeSocketBone", "Bone")
+    def init(self, context): self.inputs.new("NodeSocketBone", "Bone")
 
     def update(self):
-        if getattr(self, "_syncing", False):
-            return
+        if getattr(self, "_syncing", False): return
 
         self._syncing = True
         try:
@@ -101,15 +98,6 @@ class DefineBonePropertyNode(_BoneProperty):
         self.update()
 
     def update(self): super().update()
-        # if getattr(self, "_syncing", False):
-        #     return
-
-        # self._syncing = True
-        # try:
-        #     self._ensure_property_selection()
-        #     self._ensure_value_socket()
-        # finally:
-        #     self._syncing = False
 
     def evaluate(self, tree, scene, ctx):
         arm_ob, bone_name = self.socket_bone_ref("Bone")
@@ -326,25 +314,21 @@ class DefineBonePropertyNode(_BoneProperty):
 
             for key in data_keys:
                 key_str = str(key)
-                if key_str == "_RNA_UI":
-                    continue
+                if key_str == "_RNA_UI": continue
                 try:
                     value = data_bone[key_str]
-                except Exception:
-                    continue
+                except Exception: continue
 
                 kind = _property_kind_from_value(value)
 
-                specs.append(
-                    {
-                        "id": f"BONE_IDP:{key_str}",
-                        "source": "BONE_IDP",
-                        "key": key_str,
-                        "kind": kind,
-                        "label": f"{key_str} ({kind.lower()}, bone custom)",
-                        "description": f"Bone-data custom property '{key_str}' ({kind.lower()})",
-                    }
-                )
+                specs.append( {
+                    "id": f"BONE_IDP:{key_str}",
+                    "source": "BONE_IDP",
+                    "key": key_str,
+                    "kind": kind,
+                    "label": f"{key_str} ({kind.lower()}, bone custom)",
+                    "description": f"Bone-data custom property '{key_str}' ({kind.lower()})",
+                } )
 
         specs.sort(key=lambda spec: spec["label"].lower())
         return specs
@@ -359,53 +343,41 @@ class DefineBonePropertyNode(_BoneProperty):
         return None
 
     def _read_property_value(self, pbone, spec):
-        if pbone is None or not spec:
-            return None
+        if pbone is None or not spec: return None
         key = spec.get("key")
-        if not key:
-            return None
+        if not key: return None
         source = spec.get("source")
         if source == "BONE_IDP":
             try:
                 data_bone = getattr(pbone, "bone", None)
-                if data_bone is None:
-                    return None
+                if data_bone is None: return None
                 return data_bone[key]
-            except Exception:
-                return None
+            except Exception: return None
         try:
             return pbone[key]
-        except Exception:
-            return None
+        except Exception: return None
 
     def _write_property_value(self, pbone, spec, value):
-        if pbone is None or not spec:
-            return False
+        if pbone is None or not spec:  return False
         key = spec.get("key")
-        if not key:
-            return False
+        if not key: return False
         try:
             if spec.get("source") == "BONE_IDP":
                 data_bone = getattr(pbone, "bone", None)
-                if data_bone is None:
-                    return False
+                if data_bone is None: return False
                 data_bone[key] = value
-            else:
-                pbone[key] = value
+            else: pbone[key] = value
             return True
-        except Exception:
-            return False
+        except Exception: return False
 
     def _current_property_kind(self):
         spec = self._selected_property_spec()
-        if spec is None:
-            return None
+        if spec is None: return None
         return spec.get("kind")
 
     def _current_property_value(self):
         pbone, _ = self._pose_bone_ref()
-        if pbone is None:
-            return None
+        if pbone is None: return None
         spec = self._selected_property_spec()
         return self._read_property_value(pbone, spec)
 
@@ -523,7 +495,7 @@ class DefineBonePropertyNode(_BoneProperty):
 
 class ReadBonePropertyNode(_BoneProperty):
     bl_idname = "ReadBonePropertyNode"
-    bl_label = "Read Bone Property"
+    bl_label = "Read Bone Property at Frame"
 
     def init(self, context):
         super().init(context)
@@ -534,18 +506,6 @@ class ReadBonePropertyNode(_BoneProperty):
         self.update()
 
     def update(self): super().update()
-        # if getattr(self, "_syncing", False):
-        #     return
-
-        # self._syncing = True
-        # try:
-        #     self._ensure_property_selection()
-        #     self._ensure_output_socket()
-        # finally:
-        #     self._syncing = False
-
-    # def draw_buttons(self, context, layout): layout.prop(self, "property_name")
-
     def evaluate(self, tree, scene, ctx):
         arm_ob, bone_name = self.socket_bone_ref("Bone")
         if not arm_ob or getattr(arm_ob, "type", "") != "ARMATURE" or not bone_name:
@@ -746,18 +706,15 @@ def _property_kind_from_value(value):
             return "FLOAT_ARRAY"
 
     try:
-        if isinstance(value, bpy.types.ID):
-            return "DATA_BLOCK"
-    except Exception:
-        pass
+        if isinstance(value, bpy.types.ID): return "DATA_BLOCK"
+    except Exception: pass
 
     return "PYTHON"
 
 
 def _socket_type_for_kind(kind):
     kind = str(kind or "")
-    if not kind:
-        return None
+    if not kind: return None
     if kind.endswith("_ARRAY"):
         kind = kind.removesuffix("_ARRAY")
     if kind == "DATA_BLOCK":
