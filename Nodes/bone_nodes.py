@@ -3,14 +3,16 @@
 import json
 import bpy
 from bpy.props import EnumProperty
+
 from .Mixin import AnimGraphNodeMixin
+from ..Core import sockets
 
 
 def register():
     for c in _CLASSES: bpy.utils.register_class(c)
+
 def unregister():
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
-
 
 def _on_node_prop_update(self, context):
     try: self.update()
@@ -30,10 +32,8 @@ def _on_node_prop_update(self, context):
 
 
 def _enum_bone_property_items(self, context):
-    try:
-        return self._property_items()
-    except Exception:
-        return [("", "(select bone first)", "Pick a linked/selected bone first.")]
+    try: return self._property_items()
+    except Exception: return [("", "(select bone first)", "Pick a linked/selected bone first.")]
 
 
 class DefineBoneNode(bpy.types.Node, AnimGraphNodeMixin):
@@ -55,6 +55,125 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
         items=_enum_bone_property_items,
         update=_on_node_prop_update,
     )
+
+    def init(self, context):
+        self.inputs.new("NodeSocketBone", "Bone")
+
+        s = self.inputs.new("NodeSocketInt", "Start")
+        d = self.inputs.new("NodeSocketInt", "Duration")
+        try:
+            s.default_value = 0
+            d.default_value = 10
+        except Exception:
+            pass
+
+        self.outputs.new("NodeSocketInt", "End")
+        self.update()
+
+    def update(self):
+        if getattr(self, "_syncing", False):
+            return
+
+        self._syncing = True
+        try:
+            self._ensure_property_selection()
+            self._ensure_value_socket()
+        finally:
+            self._syncing = False
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "property_name")
+
+    def evaluate(self, tree, scene, ctx):
+        arm_ob, bone_name = self.socket_bone_ref("Bone")
+        if not arm_ob or getattr(arm_ob, "type", "") != "ARMATURE" or not bone_name:
+            return
+
+        pbone = arm_ob.pose.bones.get(bone_name)
+        if not pbone:
+            return
+
+        spec = self._selected_property_spec()
+        if spec is None:
+            return
+        prop_current = self._read_property_value(pbone, spec)
+        if prop_current is None:
+            return
+
+        prop_id = str(spec.get("id", "") or "")
+        kind = str(spec.get("kind", "") or "")
+        if not kind:
+            return
+
+        start = int(self.socket_int(tree, "Start", scene, ctx, 0))
+        duration = int(self.socket_int(tree, "Duration", scene, ctx, 10))
+        duration = max(0, duration)
+        frame = int(scene.frame_current)
+        end_value = int(start + duration)
+
+        out_end = self.outputs.get("End")
+        if out_end:
+            try:
+                out_end.default_value = int(end_value)
+            except Exception: pass
+        self.set_output_value(ctx, "End", int(end_value))
+
+        cache_key = (
+            "BONE_PROPERTY",
+            tree.as_pointer(),
+            self.as_pointer(),
+            arm_ob.as_pointer(),
+            bone_name,
+            prop_id,
+            start,
+            duration,
+        )
+
+        if frame < start:
+            ctx.pose_cache.pop(cache_key, None)
+            return
+
+        current_value = self._coerce_for_kind(prop_current, kind, prop_current)
+        value_socket = self.inputs.get("Value")
+        raw_target = self.eval_socket(tree, value_socket, scene, ctx) if value_socket else current_value
+        target = self._coerce_for_kind(raw_target, kind, current_value)
+
+        state = ctx.pose_cache.get(cache_key)
+        if state is None:
+            state = {
+                "start_value": self._clone_value(current_value),
+            }
+            ctx.pose_cache[cache_key] = state
+        start_value = state.get("start_value", current_value)
+
+        if duration <= 0:
+            t = 1.0
+        else:
+            t = (frame - start) / float(duration)
+            if t < 0.0:
+                t = 0.0
+            if t > 1.0:
+                t = 1.0
+
+        if kind == "BOOL":
+            value_out = bool(target if t >= 1.0 else start_value)
+        elif kind == "INT":
+            value_out = int(round((1.0 - t) * int(start_value) + t * int(target)))
+        elif kind == "FLOAT":
+            value_out = float((1.0 - t) * float(start_value) + t * float(target))
+        elif kind in {"VECTOR3", "MATRIX16", "ARRAY_NUMERIC"}:
+            value_out = self._lerp_numeric_sequence(start_value, target, t)
+            if kind == "VECTOR3":
+                value_out = [float(v) for v in (value_out[:3] if len(value_out) >= 3 else [0.0, 0.0, 0.0])]
+        elif kind in {"STRING", "JSON"}:
+            value_out = self._clone_value(target if t >= 1.0 else start_value)
+        else:
+            value_out = self._clone_value(target if t >= 1.0 else start_value)
+
+        try:
+            if not self._write_property_value(pbone, spec, value_out): return
+            ctx.touched_armatures.add(arm_ob)
+        except Exception: pass
 
     def _pose_bone_ref(self):
         arm_ob, bone_name = self.socket_bone_ref("Bone")
@@ -91,22 +210,25 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
         return "JSON"
 
     @staticmethod
-    def _socket_type_for_kind(kind):
-        if kind == "BOOL":
-            return "NodeSocketBool"
-        if kind == "INT":
-            return "NodeSocketInt"
-        if kind == "FLOAT":
-            return "NodeSocketFloat"
-        if kind == "STRING":
-            return "NodeSocketString"
-        if kind == "VECTOR3":
-            return "NodeSocketVectorXYZ"
-        if kind == "MATRIX16":
-            return "NodeSocketMatrix"
-        if kind in {"ARRAY_NUMERIC", "JSON"}:
-            return "NodeSocketString"
-        return None
+    def _socket_type_for_kind(kind): 
+        kind = kind.removesuffix("_ARRAY")
+        return sockets._S(kind)
+    # TODO wo verwendet überprüfen ob suffix _ARRAY und falls 3 sockets hinzufügen
+        # if kind == "BOOL":
+        #     return "NodeSocketBool"
+        # if kind == "INT":
+        #     return "NodeSocketInt"
+        # if kind == "FLOAT":
+        #     return "NodeSocketFloat"
+        # if kind == "STRING":
+        #     return "NodeSocketString"
+        # if kind == "VECTOR3":
+        #     return "NodeSocketVectorXYZ"
+        # if kind == "MATRIX16":
+        #     return "NodeSocketMatrix"
+        # if kind in {"ARRAY_NUMERIC", "JSON"}:
+        #     return "NodeSocketString"
+        # return None
 
     @staticmethod
     def _is_number(value):
@@ -600,125 +722,6 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
             sock.default_value = self._value_as_socket_payload(kind, value)
         except Exception:
             pass
-
-    def init(self, context):
-        self.inputs.new("NodeSocketBone", "Bone")
-
-        s = self.inputs.new("NodeSocketInt", "Start")
-        d = self.inputs.new("NodeSocketInt", "Duration")
-        try:
-            s.default_value = 0
-            d.default_value = 10
-        except Exception:
-            pass
-
-        self.outputs.new("NodeSocketInt", "End")
-        self.update()
-
-    def update(self):
-        if getattr(self, "_syncing", False):
-            return
-
-        self._syncing = True
-        try:
-            self._ensure_property_selection()
-            self._ensure_value_socket()
-        finally:
-            self._syncing = False
-
-    def draw_buttons(self, context, layout):
-        layout.prop(self, "property_name", text="")
-
-    def evaluate(self, tree, scene, ctx):
-        arm_ob, bone_name = self.socket_bone_ref("Bone")
-        if not arm_ob or getattr(arm_ob, "type", "") != "ARMATURE" or not bone_name:
-            return
-
-        pbone = arm_ob.pose.bones.get(bone_name)
-        if not pbone:
-            return
-
-        spec = self._selected_property_spec()
-        if spec is None:
-            return
-        prop_current = self._read_property_value(pbone, spec)
-        if prop_current is None:
-            return
-
-        prop_id = str(spec.get("id", "") or "")
-        kind = str(spec.get("kind", "") or "")
-        if not kind:
-            return
-
-        start = int(self.socket_int(tree, "Start", scene, ctx, 0))
-        duration = int(self.socket_int(tree, "Duration", scene, ctx, 10))
-        duration = max(0, duration)
-        frame = int(scene.frame_current)
-        end_value = int(start + duration)
-
-        out_end = self.outputs.get("End")
-        if out_end:
-            try:
-                out_end.default_value = int(end_value)
-            except Exception: pass
-        self.set_output_value(ctx, "End", int(end_value))
-
-        cache_key = (
-            "BONE_PROPERTY",
-            tree.as_pointer(),
-            self.as_pointer(),
-            arm_ob.as_pointer(),
-            bone_name,
-            prop_id,
-            start,
-            duration,
-        )
-
-        if frame < start:
-            ctx.pose_cache.pop(cache_key, None)
-            return
-
-        current_value = self._coerce_for_kind(prop_current, kind, prop_current)
-        value_socket = self.inputs.get("Value")
-        raw_target = self.eval_socket(tree, value_socket, scene, ctx) if value_socket else current_value
-        target = self._coerce_for_kind(raw_target, kind, current_value)
-
-        state = ctx.pose_cache.get(cache_key)
-        if state is None:
-            state = {
-                "start_value": self._clone_value(current_value),
-            }
-            ctx.pose_cache[cache_key] = state
-        start_value = state.get("start_value", current_value)
-
-        if duration <= 0:
-            t = 1.0
-        else:
-            t = (frame - start) / float(duration)
-            if t < 0.0:
-                t = 0.0
-            if t > 1.0:
-                t = 1.0
-
-        if kind == "BOOL":
-            value_out = bool(target if t >= 1.0 else start_value)
-        elif kind == "INT":
-            value_out = int(round((1.0 - t) * int(start_value) + t * int(target)))
-        elif kind == "FLOAT":
-            value_out = float((1.0 - t) * float(start_value) + t * float(target))
-        elif kind in {"VECTOR3", "MATRIX16", "ARRAY_NUMERIC"}:
-            value_out = self._lerp_numeric_sequence(start_value, target, t)
-            if kind == "VECTOR3":
-                value_out = [float(v) for v in (value_out[:3] if len(value_out) >= 3 else [0.0, 0.0, 0.0])]
-        elif kind in {"STRING", "JSON"}:
-            value_out = self._clone_value(target if t >= 1.0 else start_value)
-        else:
-            value_out = self._clone_value(target if t >= 1.0 else start_value)
-
-        try:
-            if not self._write_property_value(pbone, spec, value_out): return
-            ctx.touched_armatures.add(arm_ob)
-        except Exception: pass
 
 class ReadBonePropertyNode(DefineBonePropertyNode):
     bl_idname = "ReadBonePropertyNode"

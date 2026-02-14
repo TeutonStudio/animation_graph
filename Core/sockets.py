@@ -99,33 +99,59 @@ class NodeSocketBone(bpy.types.NodeSocket):
     def draw_color(self, context, node):
         return (0.8, 0.7, 0.2, 1.0)
 
+_SOCKET_PREFIX = "NodeSocket"
+def _S(datatype: str) -> str:
+    return _SOCKET_PREFIX + datatype.lower().capitalize()
+def _D(sockettype: str) -> str | None:
+    raw = sockettype.removeprefix(_SOCKET_PREFIX)
+    if raw != sockettype: return raw.upper()
+    return None
 
-_S_INT = "NodeSocketInt"
-_S_FLOAT = "NodeSocketFloat"
-_S_VECTOR = "NodeSocketVector"
-_S_VECTORXYZ = "NodeSocketVectorXYZ"
-_S_ROTATION = "NodeSocketRotation"
-_S_TRANSLATION = "NodeSocketVectorTranslation"
-_S_MATRIX = "NodeSocketMatrix"
-_S_BONE = "NodeSocketBone"
-_SOCKET_INT = {_S_INT}
-_SOCKET_FLOAT = {_S_FLOAT}
-_SOCKET_VECTOR = {_S_VECTOR}
-_SOCKET_VECTORXYZ = {_S_VECTORXYZ}
-_SOCKET_ROTATION = {_S_ROTATION}
-_SOCKET_TRANSLATION = {_S_TRANSLATION}
-_SOCKET_VECTORS = _SOCKET_VECTOR | _SOCKET_VECTORXYZ | _SOCKET_ROTATION | _SOCKET_TRANSLATION
-_SOCKET_MATRIX = {_S_MATRIX}
-_SOCKET_BONE = {_S_BONE}
+# _S = {
+#     "INT":          "NodeSocketInt",
+#     "FLOAT":        "NodeSocketFloat",
+#     "VECTOR":       "NodeSocketVector",
+#     "VECTORXYZ":    "NodeSocketVectorXYZ",
+#     "ROTATION":     "NodeSocketRotation",
+#     "TRANSLATION":  "NodeSocketVectorTranslation",
+#     "MATRIX":       "NodeSocketMatrix",
+#     "BONE":         "NodeSocketBone",
+#     "BOOL":         "NodeSocketBool",
+#     "STRING":       "NodeSocketString",
+#     'DATA_BLOCK':   "", # TODO
+#     'PYTHON':       "", # TODO
+# }
+# _S_rev = {v: k for k, v in _S.items() if v}
+
+# _S_INT = "NodeSocketInt"
+# _S_FLOAT = "NodeSocketFloat"
+# _S_VECTOR = "NodeSocketVector"
+# _S_VECTORXYZ = "NodeSocketVectorXYZ"
+# _S_ROTATION = "NodeSocketRotation"
+# _S_TRANSLATION = "NodeSocketVectorTranslation"
+# _S_MATRIX = "NodeSocketMatrix"
+# _S_BONE = "NodeSocketBone"
+# _S_BOOL = "NodeSocketBool"
+# _S_STRING = "NodeSocketString"
+# _D = {
+#     'FLOAT':        _S_FLOAT,
+#     'FLOAT_ARRAY':  None,
+#     'INT':          _S_INT,
+#     'INT_ARRAY':    None,
+#     'BOOL':         _S_BOOL,
+#     'BOOL_ARRAY':   None,
+#     'STRING':       _S_STRING,
+# }
+# _SOCKET_VECTORS = {_S("VECTOR"),_S("VECTORXYZ"),_S("ROTATION"),_S("TRANSLATION")}
 validLinks = {
-    _S_INT:         _SOCKET_INT,
-    _S_FLOAT:       _SOCKET_FLOAT | _SOCKET_INT,
-    _S_VECTOR:      _SOCKET_VECTORS,
-    _S_VECTORXYZ:   _SOCKET_VECTORXYZ | _SOCKET_VECTOR,
-    _S_ROTATION:    _SOCKET_ROTATION | _SOCKET_VECTOR,
-    _S_TRANSLATION: _SOCKET_TRANSLATION | _SOCKET_VECTOR,
-    _S_MATRIX:      _SOCKET_MATRIX,
-    _S_BONE:        _SOCKET_BONE,
+    "INT":         {"INT"},
+    "FLOAT":       {"FLOAT","INT"},
+    "VECTOR":      {"VECTOR","VECTORXYZ","ROTATION","TRANSLATION"},
+    "VECTORXYZ":   {"VECTORXYZ","VECTOR"},
+    "ROTATION":    {"ROTATION","VECTOR"},
+    "TRANSLATION": {"TRANSLATION","VECTOR"},
+    "MATRIX":      {"MATRIX"},
+    "BONE":        {"BONE"},
 }
 def isValidLink(l: bpy.types.NodeLink) -> bool:
     try:
@@ -136,7 +162,6 @@ def isValidLink(l: bpy.types.NodeLink) -> bool:
     except Exception:
         return False
 
-    allowed = validLinks.get(vn)
-    if allowed is None:
-        return vn == zn
+    allowed = _S(validLinks.get(vn))
+    if allowed is None: return vn == zn
     return zn in allowed or vn == zn
