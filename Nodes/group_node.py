@@ -114,7 +114,7 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
 def _evaluate_subtree_terminal_nodes(subtree, scene, sub_ctx):
     for node in getattr(subtree, "nodes", []):
         bl_idname = getattr(node, "bl_idname", "")
-        if bl_idname not in {"DefineBoneTransform", "AnimNodeGroup"}:
+        if bl_idname not in {"DefineBoneTransformNode", "DefineBonePropertyNode", "AnimNodeGroup"}:
             continue
 
         if hasattr(node, "eval_upstream"):

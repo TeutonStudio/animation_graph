@@ -721,6 +721,94 @@ class ReadBonePropertyNode(DefineBonePropertyNode):
     bl_label = "Read Bone Property"
     bl_icon = "BONE_DATA"
 
+    def _property_data_path(self, bone_name, spec):
+        key = str(spec.get("key", "") or "")
+        if not key:
+            return ""
+
+        if spec.get("source") == "BONE_IDP":
+            return f'pose.bones["{bone_name}"].bone["{key}"]'
+        return f'pose.bones["{bone_name}"]["{key}"]'
+
+    def _sample_property_from_action(self, arm_ob, bone_name, spec, kind, frame, fallback):
+        action = getattr(getattr(arm_ob, "animation_data", None), "action", None)
+        if action is None:
+            return fallback
+
+        data_path = self._property_data_path(bone_name, spec)
+        if not data_path:
+            return fallback
+
+        curves = []
+        try:
+            curves = [fc for fc in getattr(action, "fcurves", []) if getattr(fc, "data_path", "") == data_path]
+        except Exception:
+            curves = []
+
+        if not curves:
+            return fallback
+
+        by_index = {}
+        for fc in curves:
+            idx = int(getattr(fc, "array_index", 0))
+            if idx not in by_index:
+                by_index[idx] = fc
+
+        def _eval_idx(idx, fb):
+            fc = by_index.get(idx)
+            if fc is None:
+                return fb
+            try:
+                return fc.evaluate(float(frame))
+            except Exception:
+                return fb
+
+        if kind == "BOOL":
+            v = _eval_idx(0, 1.0 if self._coerce_bool(fallback, False) else 0.0)
+            return bool(float(v) >= 0.5)
+
+        if kind == "INT":
+            v = _eval_idx(0, self._coerce_int(fallback, 0))
+            return self._coerce_int(v, fallback)
+
+        if kind == "FLOAT":
+            v = _eval_idx(0, self._coerce_float(fallback, 0.0))
+            return self._coerce_float(v, fallback)
+
+        if kind in {"VECTOR3", "MATRIX16", "ARRAY_NUMERIC"}:
+            base = self._coerce_for_kind(fallback, kind, fallback)
+            seq = self._to_sequence(base) or []
+
+            if kind == "VECTOR3":
+                wanted_len = 3
+            elif kind == "MATRIX16":
+                wanted_len = 16
+            else:
+                wanted_len = len(seq) if seq else (max(by_index.keys()) + 1 if by_index else 0)
+
+            if wanted_len <= 0:
+                return base
+
+            if len(seq) < wanted_len:
+                seq = list(seq) + [0.0] * (wanted_len - len(seq))
+            else:
+                seq = list(seq[:wanted_len])
+
+            for idx in range(wanted_len):
+                seq[idx] = _eval_idx(idx, seq[idx])
+
+            if kind == "VECTOR3":
+                return [self._coerce_float(v, 0.0) for v in seq[:3]]
+            if kind == "MATRIX16":
+                return [self._coerce_float(v, 0.0) for v in seq[:16]]
+
+            all_int = all(isinstance(v, int) and not isinstance(v, bool) for v in (self._to_sequence(base) or []))
+            if all_int:
+                return [self._coerce_int(v, 0) for v in seq]
+            return [self._coerce_float(v, 0.0) for v in seq]
+
+        return fallback
+
     def _ensure_output_socket(self):
         kind = self._current_property_kind()
         wanted_type = self._socket_type_for_kind(kind)
@@ -749,6 +837,11 @@ class ReadBonePropertyNode(DefineBonePropertyNode):
 
     def init(self, context):
         self.inputs.new("NodeSocketBone", "Bone")
+        frame = self.inputs.new("NodeSocketInt", "Frame")
+        try:
+            frame.default_value = 0
+        except Exception:
+            pass
         self.outputs.new("NodeSocketFloat", "Value")
         self.update()
 
@@ -788,6 +881,11 @@ class ReadBonePropertyNode(DefineBonePropertyNode):
             return
 
         value = self._coerce_for_kind(value_raw, kind, value_raw)
+        frame_in = int(self.socket_int(tree, "Frame", scene, ctx, int(scene.frame_current)))
+        cur_frame = int(scene.frame_current)
+        if frame_in != cur_frame:
+            value = self._sample_property_from_action(arm_ob, bone_name, spec, kind, frame_in, value)
+
         payload = self._value_as_socket_payload(kind, value)
 
         out = self.outputs.get("Value")

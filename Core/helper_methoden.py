@@ -955,7 +955,7 @@ def _collect_transform_tracks(tree):
     stack = set()
 
     for node in getattr(tree, "nodes", []):
-        if getattr(node, "bl_idname", "") != "DefineBoneTransform":
+        if getattr(node, "bl_idname", "") != "DefineBoneTransformNode":
             continue
 
         bone_in = getattr(node, "inputs", {}).get("Bone")
@@ -1060,7 +1060,7 @@ def _append_new_frames_to_tree(action, tree, context=None):
         for idx, (start, end_value) in enumerate(target_ranges):
             node = existing_by_start.get(int(start))
             if node is None:
-                node = tree.nodes.new("DefineBoneTransform")
+                node = tree.nodes.new("DefineBoneTransformNode")
                 _copy_transform_settings(source_node, node)
                 changed = True
 
@@ -1283,7 +1283,7 @@ def _import_tree_from_action_timekeys(action, tree, context=None):
 
         prev_transform = None
         for col_idx, (start, end) in enumerate(ranges):
-            transform = tree.nodes.new("DefineBoneTransform")
+            transform = tree.nodes.new("DefineBoneTransformNode")
             transform_name = display_name
             transform.name = f"{transform_name} [{start}-{end}]"
             transform.label = f"{transform_name} {start}->{end}"
@@ -1449,7 +1449,7 @@ def _resolve_int_input(sock, node_cache, stack, group_env=None, group_stack=None
 
         if (
             node
-            and getattr(node, "bl_idname", "") in {"DefineBoneTransform", "DefineBonePropertieNode"}
+            and getattr(node, "bl_idname", "") in {"DefineBoneTransformNode", "DefineBonePropertyNode"}
             and from_sock.name == "End"
         ):
             return _resolve_transform_end(
@@ -1551,7 +1551,7 @@ def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, 
     try:
         for node in getattr(tree, "nodes", []):
             bl_idname = getattr(node, "bl_idname", "")
-            if bl_idname in {"DefineBoneTransform", "DefineBonePropertieNode"}:
+            if bl_idname in {"DefineBoneTransformNode", "DefineBonePropertyNode"}:
                 start = _resolve_int_input(
                     node.inputs.get("Start"),
                     node_cache,

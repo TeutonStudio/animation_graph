@@ -9,7 +9,7 @@ _RUNNING = False
 _DEPSGRAPH_SYNC_RUNNING = False
 
 # Persistent pose cache across frames (needed for interpolation / start pose capture)
-# Keying is done by nodes themselves (see DefineBoneTransform / ReadBoneTransform implementations)
+# Keying is done by nodes themselves (see DefineBoneTransformNode / ReadBoneTransformNode implementations)
 _POSE_CACHE = {}
 
 # Per-frame evaluation cache to prevent cycles / re-evaluation
@@ -143,7 +143,7 @@ def _evaluate_tree(tree, action, scene, ctx):
     """
     _apply_action_inputs_to_group_inputs(tree, action, ctx)
 
-    for n in _find_nodes(tree, "DefineBoneTransform"):
+    for n in _find_nodes(tree, "DefineBoneTransformNode"):
         # Preferred path: mixin provides eval_upstream (handles caching)
         if hasattr(n, "eval_upstream"):
             n.eval_upstream(tree, scene, ctx)
@@ -154,7 +154,7 @@ def _evaluate_tree(tree, action, scene, ctx):
         if callable(fn):
             fn(tree, scene, ctx)
 
-    for n in _find_nodes(tree, "DefineBonePropertieNode"):
+    for n in _find_nodes(tree, "DefineBonePropertyNode"):
         if hasattr(n, "eval_upstream"):
             n.eval_upstream(tree, scene, ctx)
             continue
