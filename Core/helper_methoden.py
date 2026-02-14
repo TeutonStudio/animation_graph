@@ -1,6 +1,7 @@
 # animation_graph/Core/helper_methoden.py
 
 from mathutils import Quaternion
+from types import SimpleNamespace
 import re
 import bpy
 
@@ -26,7 +27,6 @@ def _pointer_uid(value):
         return ("PTR", int(value.as_pointer()))
     except Exception:
         return ("PY", id(value))
-
 
 def _iter_action_slots(action, context=None):
     seen = set()
@@ -57,7 +57,6 @@ def _iter_action_slots(action, context=None):
         if slot is None:
             continue
         yield from _emit(slot)
-
 
 def _resolve_strip_channelbag(strip, slot=None, ensure=False):
     method_names = ("channelbag", "channelbag_for_slot", "channelbag_for", "get_channelbag")
@@ -97,7 +96,6 @@ def _resolve_strip_channelbag(strip, slot=None, ensure=False):
                 return bag
 
     return None
-
 
 def _iter_action_fcurve_collections(action, context=None):
     seen = set()
@@ -142,7 +140,6 @@ def _iter_action_fcurve_collections(action, context=None):
                     if bag_fcurves is not None:
                         yield from _emit(bag_fcurves)
 
-
 def _iter_action_fcurves(action, context=None):
     seen = set()
 
@@ -159,7 +156,6 @@ def _iter_action_fcurves(action, context=None):
             seen.add(uid)
             yield fcurve
 
-
 def _find_writable_fcurve_collection(action, context=None):
     direct_fcurves = getattr(action, "fcurves", None)
     if direct_fcurves is not None and hasattr(direct_fcurves, "new"):
@@ -170,7 +166,6 @@ def _find_writable_fcurve_collection(action, context=None):
             return collection
     return None
 
-
 def _on_action_input_changed(self, context):
     action = getattr(self, "id_data", None)
     tree = getattr(action, "animgraph_tree", None) if action else None
@@ -179,7 +174,6 @@ def _on_action_input_changed(self, context):
             tree.dirty = True
         except Exception:
             pass
-
 
 def _on_action_tree_changed(self, context):
     tree = getattr(self, "animgraph_tree", None)
@@ -192,7 +186,6 @@ def _on_action_tree_changed(self, context):
         return
 
     initialize_action_tree_binding(self, tree, context)
-
 
 def initialize_action_tree_binding(action, tree, context=None):
     if action is None:
@@ -216,14 +209,11 @@ def initialize_action_tree_binding(action, tree, context=None):
     except Exception:
         pass
 
-
 def _poll_armature_obj(self, obj):
     return obj is not None and obj.type == "ARMATURE"
 
-
 def _poll_animgraph_tree(self, tree):
     return tree is not None and getattr(tree, "bl_idname", "") == "AnimNodeTree"
-
 
 def _enum_slot_bones(self, context):
     arm_obj = getattr(self, "bone_armature_obj", None)
@@ -239,7 +229,6 @@ def _enum_slot_bones(self, context):
         return [("", "(no bones)", "The selected armature has no bones.")]
     return items
 
-
 def _on_slot_armature_changed(self, context):
     arm_obj = getattr(self, "bone_armature_obj", None)
     current = getattr(self, "bone_name", "")
@@ -250,7 +239,6 @@ def _on_slot_armature_changed(self, context):
         self.bone_name = ""
 
     _on_action_input_changed(self, context)
-
 
 def socket_kind(socket_type):
     socket_type = socket_type or ""
@@ -267,14 +255,11 @@ def socket_kind(socket_type):
         return "VECTOR"
     return "UNSUPPORTED"
 
-
 def interface_socket_identifier(iface_socket):
     return getattr(iface_socket, "identifier", None) or getattr(iface_socket, "name", None) or ""
 
-
 def interface_socket_type(iface_socket):
     return getattr(iface_socket, "bl_socket_idname", None) or getattr(iface_socket, "socket_type", None) or ""
-
 
 def iter_interface_sockets(tree, in_out=None):
     iface = getattr(tree, "interface", None)
@@ -293,13 +278,11 @@ def iter_interface_sockets(tree, in_out=None):
         return []
     return sockets_out
 
-
 def find_action_input_slot(action, identifier):
     for slot in getattr(action, "animgraph_input_values", []):
         if slot.identifier == identifier:
             return slot
     return None
-
 
 def _matrix_to_16(value):
     ident = (
@@ -320,7 +303,6 @@ def _matrix_to_16(value):
         return tuple(flat)
     except Exception:
         return ident
-
 
 def _assign_slot_default(slot, iface_socket):
     kind = socket_kind(slot.socket_type)
@@ -347,7 +329,6 @@ def _assign_slot_default(slot, iface_socket):
             slot.bone_name = getattr(iface_socket, "bone_name", "") or ""
     except Exception:
         pass
-
 
 def sync_action_inputs(action, tree):
     if action is None or tree is None:
@@ -387,13 +368,11 @@ def sync_action_inputs(action, tree):
 
     return iface_inputs
 
-
 def _iter_non_timekey_fcurves(action, context=None):
     for fcurve in _iter_action_fcurves(action, context=context):
         if getattr(fcurve, "data_path", "") in _ALL_TIMEKEY_CHANNEL_PATHS:
             continue
         yield fcurve
-
 
 def _find_any_timekey_fcurve(action, context=None):
     fcurves = list(_iter_action_fcurves(action, context=context))
@@ -406,19 +385,16 @@ def _find_any_timekey_fcurve(action, context=None):
             return fcurve, path
     return None, None
 
-
 def _append_frame_value(out_set, value):
     try:
         out_set.add(int(round(float(value))))
     except Exception:
         pass
 
-
 def _extract_numeric_tokens(text):
     if text is None:
         return []
     return re.findall(r"-?\d+(?:\.\d+)?", str(text))
-
 
 def _read_action_property_value(action, prop_name):
     val = None
@@ -434,7 +410,6 @@ def _read_action_property_value(action, prop_name):
         except Exception:
             val = None
     return val
-
 
 def _mapping_items(value):
     if isinstance(value, dict):
@@ -452,7 +427,6 @@ def _mapping_items(value):
         except Exception:
             pass
     return out
-
 
 def _collect_frames_from_any(out_set, value):
     if value is None:
@@ -501,7 +475,6 @@ def _collect_frames_from_any(out_set, value):
     for item in iterator:
         _collect_frames_from_any(out_set, item)
 
-
 def _extract_scalar_int(value):
     if value is None:
         return None
@@ -518,7 +491,6 @@ def _extract_scalar_int(value):
             except Exception:
                 return None
     return None
-
 
 def _extract_vector3(value):
     if value is None:
@@ -566,7 +538,6 @@ def _extract_vector3(value):
         return (float(seq[0]), float(seq[1]), float(seq[2]))
     except Exception:
         return None
-
 
 def _extract_timekey_entry_from_mapping(data_items):
     lower = {str(k).lower(): v for k, v in data_items}
@@ -626,7 +597,6 @@ def _extract_timekey_entry_from_mapping(data_items):
 
     return entry
 
-
 def _collect_timekey_entries_from_any(value, out_entries):
     if value is None:
         return
@@ -654,7 +624,6 @@ def _collect_timekey_entries_from_any(value, out_entries):
     for item in iterator:
         _collect_timekey_entries_from_any(item, out_entries)
 
-
 def _collect_timekey_entries_from_action_properties(action):
     entries = []
 
@@ -673,7 +642,6 @@ def _collect_timekey_entries_from_action_properties(action):
         pass
 
     return entries
-
 
 def _collect_time_frames_from_action_properties(action):
     frames = set()
@@ -700,7 +668,6 @@ def _collect_time_frames_from_action_properties(action):
         _append_frame_value(frames, getattr(marker, "frame", None))
 
     return sorted(frames)
-
 
 def _collect_action_time_frames(action, context=None):
     fcurve, _ = _find_any_timekey_fcurve(action, context=context)
@@ -741,7 +708,6 @@ def _collect_action_time_frames(action, context=None):
                 pass
     return sorted(seen)
 
-
 def _collect_bone_fcurves(action, context=None):
     bones = {}
 
@@ -776,7 +742,6 @@ def _collect_bone_fcurves(action, context=None):
 
     return bones
 
-
 def _fcurve_eval(fcurve, frame, fallback):
     if fcurve is None:
         return fallback
@@ -784,7 +749,6 @@ def _fcurve_eval(fcurve, frame, fallback):
         return float(fcurve.evaluate(float(frame)))
     except Exception:
         return fallback
-
 
 def _evaluate_bone_target(channels, frame):
     loc_curves = channels.get("location", {})
@@ -838,7 +802,6 @@ def _evaluate_bone_target(channels, frame):
 
     return loc, rot, scale
 
-
 def _find_action_armature(action, context=None):
     obj = getattr(context, "object", None) if context else None
     if obj is not None and getattr(obj, "type", "") == "ARMATURE":
@@ -854,14 +817,12 @@ def _find_action_armature(action, context=None):
             return obj
     return None
 
-
 def _tree_has_user_nodes(tree):
     for node in getattr(tree, "nodes", []):
         if getattr(node, "type", "") in {"GROUP_INPUT", "GROUP_OUTPUT"}:
             continue
         return True
     return False
-
 
 def _set_node_input_default(node, socket_name, value):
     sock = getattr(node, "inputs", {}).get(socket_name) if node else None
@@ -872,7 +833,6 @@ def _set_node_input_default(node, socket_name, value):
     except Exception:
         pass
 
-
 def _link(tree, out_sock, in_sock):
     if tree is None or out_sock is None or in_sock is None:
         return
@@ -880,7 +840,6 @@ def _link(tree, out_sock, in_sock):
         tree.links.new(out_sock, in_sock)
     except Exception:
         pass
-
 
 def _clear_input_links(tree, in_sock):
     if tree is None or in_sock is None:
@@ -890,7 +849,6 @@ def _clear_input_links(tree, in_sock):
             tree.links.remove(link)
         except Exception:
             pass
-
 
 def _ensure_link(tree, out_sock, in_sock, clear_input=False):
     if tree is None or out_sock is None or in_sock is None:
@@ -903,7 +861,6 @@ def _ensure_link(tree, out_sock, in_sock, clear_input=False):
         if getattr(link, "from_socket", None) == out_sock:
             return
     _link(tree, out_sock, in_sock)
-
 
 def _socket_default_value(sock, fallback=None):
     if sock is None or not hasattr(sock, "default_value"):
@@ -921,7 +878,6 @@ def _socket_default_value(sock, fallback=None):
     if isinstance(value, (list, tuple)):
         return tuple(value)
     return value
-
 
 def _copy_transform_settings(src_node, dst_node):
     if src_node is None or dst_node is None:
@@ -948,11 +904,11 @@ def _copy_transform_settings(src_node, dst_node):
         except Exception:
             pass
 
-
-def _collect_transform_tracks(tree):
+def _collect_transform_tracks(tree, scene=None):
     tracks_by_bone = {}
     node_cache = {}
     stack = set()
+    eval_state = _new_timekey_eval_state(scene=scene)
 
     for node in getattr(tree, "nodes", []):
         if getattr(node, "bl_idname", "") != "DefineBoneTransformNode":
@@ -981,8 +937,20 @@ def _collect_transform_tracks(tree):
             },
         )
 
-        start = _resolve_int_input(getattr(node, "inputs", {}).get("Start"), node_cache, stack)
-        end_value = _resolve_transform_end(node, node_cache, stack)
+        start = _resolve_int_input(
+            getattr(node, "inputs", {}).get("Start"),
+            node_cache,
+            stack,
+            eval_state=eval_state,
+            current_tree=tree,
+        )
+        end_value = _resolve_transform_end(
+            node,
+            node_cache,
+            stack,
+            eval_state=eval_state,
+            current_tree=tree,
+        )
         track["nodes"].append(
             {
                 "node": node,
@@ -1003,16 +971,17 @@ def _collect_transform_tracks(tree):
         tracks.append(track)
     return tracks
 
-
 def _append_new_frames_to_tree(action, tree, context=None):
     if action is None or tree is None:
         return False
+
+    eval_scene = getattr(context, "scene", None) if context is not None else None
 
     action_frames = _collect_action_time_frames(action, context=context)
     if not action_frames:
         return False
 
-    tree_frames = collect_tree_timekeys(tree)
+    tree_frames = collect_tree_timekeys(tree, scene=eval_scene)
     if not tree_frames:
         return False
 
@@ -1033,12 +1002,13 @@ def _append_new_frames_to_tree(action, tree, context=None):
     if not target_ranges:
         return False
 
-    tracks = _collect_transform_tracks(tree)
+    tracks = _collect_transform_tracks(tree, scene=eval_scene)
     if not tracks:
         return False
 
     changed = False
     x_step = 280.0
+    duration_eval_state = _new_timekey_eval_state(scene=eval_scene)
 
     for track in tracks:
         nodes = track.get("nodes", [])
@@ -1100,7 +1070,13 @@ def _append_new_frames_to_tree(action, tree, context=None):
                 _ensure_link(tree, getattr(prev_node, "outputs", {}).get("End"), start_in, clear_input=True)
 
             wanted_duration = max(0, int(end_value) - int(start))
-            current_duration = _resolve_int_input(getattr(node, "inputs", {}).get("Duration"), {}, set())
+            current_duration = _resolve_int_input(
+                getattr(node, "inputs", {}).get("Duration"),
+                {},
+                set(),
+                eval_state=duration_eval_state,
+                current_tree=tree,
+            )
             if current_duration != wanted_duration:
                 changed = True
             _set_node_input_default(node, "Duration", int(wanted_duration))
@@ -1111,7 +1087,6 @@ def _append_new_frames_to_tree(action, tree, context=None):
         except Exception:
             pass
     return changed
-
 
 def sync_tree_from_action_timekeys(action, tree, context=None):
     if action is None or tree is None:
@@ -1124,7 +1099,6 @@ def sync_tree_from_action_timekeys(action, tree, context=None):
 
     return _append_new_frames_to_tree(action, tree, context=context)
 
-
 def _empty_transform_channels():
     return {
         "location": {},
@@ -1133,7 +1107,6 @@ def _empty_transform_channels():
         "rotation_axis_angle": {},
         "scale": {},
     }
-
 
 def _group_timekey_entries_by_bone(entries):
     grouped = {}
@@ -1159,13 +1132,11 @@ def _group_timekey_entries_by_bone(entries):
 
     return grouped
 
-
 def _entry_for_frame(entry_meta, frame):
     if not entry_meta:
         return None
     values = entry_meta.get("entries_by_frame", {}).get(int(frame), [])
     return values[0] if values else None
-
 
 def _entry_explicit_end(entry, start):
     if not entry:
@@ -1181,7 +1152,6 @@ def _entry_explicit_end(entry, start):
 
     return None
 
-
 def _pick_entry_vector(entry, key):
     if not entry:
         return None
@@ -1189,7 +1159,6 @@ def _pick_entry_vector(entry, key):
     if vec is None:
         return None
     return _extract_vector3(vec)
-
 
 def _import_tree_from_action_timekeys(action, tree, context=None):
     if action is None or tree is None:
@@ -1336,11 +1305,9 @@ def _import_tree_from_action_timekeys(action, tree, context=None):
                 )
             prev_transform = transform
 
-
 def _find_timekey_fcurve(action, context=None):
     fcurve, _ = _find_any_timekey_fcurve(action, context=context)
     return fcurve
-
 
 def _fcurve_key_frames(fcurve):
     out = []
@@ -1350,7 +1317,6 @@ def _fcurve_key_frames(fcurve):
         except Exception:
             pass
     return sorted(set(out))
-
 
 def _group_env_key(group_env):
     if not group_env:
@@ -1364,6 +1330,47 @@ def _group_env_key(group_env):
         cur = cur.get("parent_env")
     return tuple(out)
 
+def _coerce_int_scalar(value, fallback=0):
+    try:
+        return int(round(float(value)))
+    except Exception:
+        return int(fallback)
+
+def _resolve_timekey_scene(scene=None):
+    if scene is not None:
+        return scene
+    try:
+        return bpy.context.scene
+    except Exception:
+        return None
+
+def _new_timekey_eval_state(scene=None):
+    return SimpleNamespace(
+        scene=_resolve_timekey_scene(scene),
+        contexts={},
+        seeded_group_inputs=set(),
+        seeding_group_inputs=set(),
+    )
+
+def _timekey_eval_scope_key(current_tree, group_env):
+    return (_pointer_uid(current_tree), _group_env_key(group_env))
+
+def _timekey_eval_ctx(eval_state, current_tree, group_env):
+    if eval_state is None:
+        return None
+
+    scope_key = _timekey_eval_scope_key(current_tree, group_env)
+    ctx = eval_state.contexts.get(scope_key)
+    if ctx is None:
+        ctx = SimpleNamespace(
+            eval_cache=set(),
+            pose_cache={},
+            touched_armatures=set(),
+            values={},
+            eval_stack=set(),
+        )
+        eval_state.contexts[scope_key] = ctx
+    return ctx
 
 def _socket_index(sockets, needle):
     if sockets is None:
@@ -1384,7 +1391,6 @@ def _socket_index(sockets, needle):
             pass
     return -1
 
-
 def _active_group_output_node(tree):
     outputs = [n for n in getattr(tree, "nodes", []) if getattr(n, "type", "") == "GROUP_OUTPUT"]
     if not outputs:
@@ -1393,7 +1399,6 @@ def _active_group_output_node(tree):
         if getattr(node, "is_active_output", False):
             return node
     return outputs[0]
-
 
 def _resolve_group_input_source(group_input_node, from_sock, group_env):
     if not group_env:
@@ -1413,7 +1418,6 @@ def _resolve_group_input_source(group_input_node, from_sock, group_env):
 
     return (group_inputs[idx], group_env.get("parent_env"))
 
-
 def _resolve_group_output_source(group_node, from_sock, group_env):
     subtree = getattr(group_node, "node_tree", None)
     if not subtree or getattr(subtree, "bl_idname", "") != "AnimNodeTree":
@@ -1432,11 +1436,94 @@ def _resolve_group_output_source(group_node, from_sock, group_env):
         return (None, None)
 
     sub_in = group_output_inputs[out_idx]
-    sub_env = {"group_node": group_node, "parent_env": group_env}
+    sub_env = {
+        "group_node": group_node,
+        "parent_env": group_env,
+        "tree": getattr(group_node, "id_data", None),
+    }
     return (sub_in, sub_env)
 
+def _seed_group_input_runtime_values(tree, group_env, node_cache, stack, group_stack, eval_state, eval_ctx):
+    if tree is None or eval_state is None:
+        return
 
-def _resolve_int_input(sock, node_cache, stack, group_env=None, group_stack=None):
+    seed_key = (_pointer_uid(tree), _group_env_key(group_env))
+    if seed_key in eval_state.seeded_group_inputs or seed_key in eval_state.seeding_group_inputs:
+        return
+
+    eval_state.seeding_group_inputs.add(seed_key)
+    try:
+        for node in getattr(tree, "nodes", []):
+            if getattr(node, "type", "") != "GROUP_INPUT":
+                continue
+
+            for out_sock in getattr(node, "outputs", []):
+                if getattr(out_sock, "bl_idname", "") != "NodeSocketInt":
+                    continue
+
+                value = getattr(out_sock, "default_value", 0)
+                if group_env:
+                    parent_sock, parent_env = _resolve_group_input_source(node, out_sock, group_env)
+                    if parent_sock is not None:
+                        value = _resolve_int_input(
+                            parent_sock,
+                            node_cache,
+                            stack,
+                            group_env=parent_env,
+                            group_stack=group_stack,
+                            eval_state=eval_state,
+                            current_tree=group_env.get("tree"),
+                        )
+
+                eval_ctx.values[(node.as_pointer(), out_sock.name)] = _coerce_int_scalar(value, 0)
+    finally:
+        eval_state.seeding_group_inputs.discard(seed_key)
+        eval_state.seeded_group_inputs.add(seed_key)
+
+def _resolve_linked_socket_int(from_sock, node_cache, stack, group_env, group_stack, eval_state, current_tree):
+    fallback = getattr(from_sock, "default_value", 0)
+    node = getattr(from_sock, "node", None)
+    if eval_state is None or node is None:
+        return _coerce_int_scalar(fallback, 0)
+
+    node_type = getattr(node, "bl_idname", "")
+    if node_type in {"DefineBoneTransformNode", "DefineBonePropertyNode", "AnimNodeGroup"}:
+        return _coerce_int_scalar(fallback, 0)
+
+    eval_ctx = _timekey_eval_ctx(eval_state, current_tree, group_env)
+    if eval_ctx is None:
+        return _coerce_int_scalar(fallback, 0)
+
+    try:
+        _seed_group_input_runtime_values(
+            current_tree,
+            group_env,
+            node_cache,
+            stack,
+            group_stack,
+            eval_state,
+            eval_ctx,
+        )
+    except Exception:
+        pass
+
+    eval_tree = getattr(node, "id_data", None) or current_tree
+    scene = eval_state.scene
+    if eval_tree is not None and scene is not None:
+        try:
+            if hasattr(node, "eval_upstream"):
+                node.eval_upstream(eval_tree, scene, eval_ctx)
+            else:
+                fn = getattr(node, "evaluate", None)
+                if callable(fn):
+                    fn(eval_tree, scene, eval_ctx)
+        except Exception:
+            pass
+
+    value = eval_ctx.values.get((node.as_pointer(), from_sock.name), fallback)
+    return _coerce_int_scalar(value, 0)
+
+def _resolve_int_input(sock, node_cache, stack, group_env=None, group_stack=None, eval_state=None, current_tree=None):
     if sock is None:
         return 0
 
@@ -1458,6 +1545,8 @@ def _resolve_int_input(sock, node_cache, stack, group_env=None, group_stack=None
                 stack,
                 group_env=group_env,
                 group_stack=group_stack,
+                eval_state=eval_state,
+                current_tree=current_tree,
             )
 
         if node and getattr(node, "type", "") == "GROUP_INPUT":
@@ -1469,6 +1558,8 @@ def _resolve_int_input(sock, node_cache, stack, group_env=None, group_stack=None
                     stack,
                     group_env=parent_env,
                     group_stack=group_stack,
+                    eval_state=eval_state,
+                    current_tree=group_env.get("tree") if group_env else None,
                 )
 
         if node and getattr(node, "bl_idname", "") == "AnimNodeGroup":
@@ -1488,30 +1579,30 @@ def _resolve_int_input(sock, node_cache, stack, group_env=None, group_stack=None
                             stack,
                             group_env=sub_env,
                             group_stack=group_stack,
+                            eval_state=eval_state,
+                            current_tree=getattr(node, "node_tree", None),
                         )
                 finally:
                     group_stack.discard(guard)
 
-        try:
-            return int(round(float(getattr(from_sock, "default_value", 0))))
-        except Exception:
-            return 0
+        return _resolve_linked_socket_int(
+            from_sock,
+            node_cache,
+            stack,
+            group_env,
+            group_stack,
+            eval_state,
+            current_tree,
+        )
 
-    try:
-        return int(round(float(getattr(sock, "default_value", 0))))
-    except Exception:
-        return 0
+    return _coerce_int_scalar(getattr(sock, "default_value", 0), 0)
 
-
-def _resolve_transform_end(node, node_cache, stack, group_env=None, group_stack=None):
+def _resolve_transform_end(node, node_cache, stack, group_env=None, group_stack=None, eval_state=None, current_tree=None):
     cache_key = (_pointer_uid(node), _group_env_key(group_env))
     if cache_key in node_cache:
         return node_cache[cache_key]
     if cache_key in stack:
-        try:
-            return int(round(float(getattr(node.outputs.get("End"), "default_value", 0))))
-        except Exception:
-            return 0
+        return _coerce_int_scalar(getattr(node.outputs.get("End"), "default_value", 0), 0)
 
     stack.add(cache_key)
     try:
@@ -1521,6 +1612,8 @@ def _resolve_transform_end(node, node_cache, stack, group_env=None, group_stack=
             stack,
             group_env=group_env,
             group_stack=group_stack,
+            eval_state=eval_state,
+            current_tree=current_tree,
         )
         duration = _resolve_int_input(
             node.inputs.get("Duration"),
@@ -1528,6 +1621,8 @@ def _resolve_transform_end(node, node_cache, stack, group_env=None, group_stack=
             stack,
             group_env=group_env,
             group_stack=group_stack,
+            eval_state=eval_state,
+            current_tree=current_tree,
         )
         end_value = int(start + max(0, duration))
     finally:
@@ -1536,8 +1631,7 @@ def _resolve_transform_end(node, node_cache, stack, group_env=None, group_stack=
     node_cache[cache_key] = end_value
     return end_value
 
-
-def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, group_env=None, group_stack=None):
+def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, group_env=None, group_stack=None, eval_state=None):
     if tree is None:
         return
 
@@ -1558,6 +1652,8 @@ def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, 
                     stack,
                     group_env=group_env,
                     group_stack=group_stack,
+                    eval_state=eval_state,
+                    current_tree=tree,
                 )
                 duration = _resolve_int_input(
                     node.inputs.get("Duration"),
@@ -1565,6 +1661,8 @@ def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, 
                     stack,
                     group_env=group_env,
                     group_stack=group_stack,
+                    eval_state=eval_state,
+                    current_tree=tree,
                 )
                 end_value = int(start + max(0, duration))
 
@@ -1579,7 +1677,7 @@ def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, 
             if not subtree or getattr(subtree, "bl_idname", "") != "AnimNodeTree":
                 continue
 
-            sub_env = {"group_node": node, "parent_env": group_env}
+            sub_env = {"group_node": node, "parent_env": group_env, "tree": tree}
             _collect_tree_timekeys_recursive(
                 subtree,
                 keys,
@@ -1588,12 +1686,12 @@ def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, 
                 tree_stack,
                 group_env=sub_env,
                 group_stack=group_stack,
+                eval_state=eval_state,
             )
     finally:
         tree_stack.discard(tree_uid)
 
-
-def collect_tree_timekeys(tree):
+def collect_tree_timekeys(tree, scene=None):
     if tree is None:
         return []
 
@@ -1602,6 +1700,7 @@ def collect_tree_timekeys(tree):
     stack = set()
     tree_stack = set()
     group_stack = set()
+    eval_state = _new_timekey_eval_state(scene=scene)
 
     _collect_tree_timekeys_recursive(
         tree,
@@ -1611,10 +1710,10 @@ def collect_tree_timekeys(tree):
         tree_stack,
         group_env=None,
         group_stack=group_stack,
+        eval_state=eval_state,
     )
 
     return sorted(keys)
-
 
 def _write_action_timekey_channel(action, frames, context=None):
     if action is None:
@@ -1692,7 +1791,6 @@ def _write_action_timekey_channel(action, frames, context=None):
     except Exception:
         pass
 
-
 def _set_action_timekey_editable(action, editable):
     lock = not bool(editable)
     for fcurve in _iter_action_fcurves(action):
@@ -1702,7 +1800,6 @@ def _set_action_timekey_editable(action, editable):
         except Exception:
             pass
 
-
 def sync_action_timekeys_from_tree(action, tree, context=None):
     if action is None:
         return
@@ -1711,10 +1808,10 @@ def sync_action_timekeys_from_tree(action, tree, context=None):
         _set_action_timekey_editable(action, True)
         return
 
-    frames = collect_tree_timekeys(tree)
+    eval_scene = getattr(context, "scene", None) if context is not None else None
+    frames = collect_tree_timekeys(tree, scene=eval_scene)
     _write_action_timekey_channel(action, frames, context=context)
     _set_action_timekey_editable(action, False)
-
 
 def sync_actions_for_tree(tree, context=None):
     if tree is None:
@@ -1725,7 +1822,6 @@ def sync_actions_for_tree(tree, context=None):
             continue
         sync_action_inputs(action, tree)
         sync_action_timekeys_from_tree(action, tree, context=context)
-
 
 def _slot_runtime_value(slot):
     kind = socket_kind(slot.socket_type)
@@ -1750,7 +1846,6 @@ def _slot_runtime_value(slot):
             (float(v[12]), float(v[13]), float(v[14]), float(v[15])),
         )
     return None
-
 
 def build_action_input_value_map(action, tree):
     values = {}
