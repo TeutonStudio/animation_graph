@@ -45,6 +45,11 @@ class ANIMGRAPH_OT_enter_group(Operator):
             return {'CANCELLED'}
 
         subgroup = node.node_tree
+        try:
+            from ..Nodes.group_node import ensure_group_io_nodes
+            ensure_group_io_nodes(subgroup)
+        except Exception:
+            pass
 
         if len(space.path) == 0: space.path.start(tree) 
         space.path.append(subgroup, node=node)

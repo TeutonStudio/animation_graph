@@ -382,25 +382,29 @@ def ensure_group_io_nodes(subtree: bpy.types.NodeTree):
             return None
 
         # 1) ensure input
+        created_input = False
         n_in = find_group_input()
         if n_in is None:
             try:
                 n_in = subtree.nodes.new("NodeGroupInput")
+                created_input = True
             except Exception:
                 n_in = find_group_input()
 
         # 2) ensure output
+        created_output = False
         n_out = find_group_output()
         if n_out is None:
             try:
                 n_out = subtree.nodes.new("NodeGroupOutput")
+                created_output = True
             except Exception:
                 n_out = find_group_output()
 
-        # 3) position them sensibly
-        if n_in is not None:
+        # 3) position only nodes created now; keep existing user layout intact.
+        if created_input and n_in is not None:
             n_in.location = (-300.0, 0.0)
-        if n_out is not None:
+        if created_output and n_out is not None:
             n_out.location = (300.0, 0.0)
     finally:
         _ENSURE_IO_GUARDS.discard(tree_key)
