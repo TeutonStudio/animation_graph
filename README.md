@@ -5,7 +5,7 @@ Es verknuepft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 
 ## Status
 
-- Version: `0.2.2`
+- Version: `0.2.3`
 - Addon-ID: `animgraph`
 - Ziel-Blender-Version: `>= 5.0.0`
 
