@@ -5,7 +5,7 @@ Es verknüpft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 
 ## Status
 
-- Version: `0.2.3`
+- Version: `0.2.4`
 - Addon-ID: `animgraph`
 - Ziel-Blender-Version: `>= 5.0.0`
 
@@ -26,7 +26,6 @@ Es verknüpft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 
 ### Option 1: Addon installieren
 
-~~1. Projektordner zippen (die ZIP muss direkt `__init__.py` enthalten).~~
 1. Addon unter github release herunterladen. [GitHubRelease](https://github.com/TeutonStudio/animation_graph/releases)
 2. In Blender `Edit > Preferences > Add-ons > Install from Disk...` öffnen.
 3. ZIP auswählen und `AnimationGraph` aktivieren.
