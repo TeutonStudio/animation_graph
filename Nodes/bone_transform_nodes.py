@@ -152,7 +152,7 @@ class _BoneTransform(Node, AnimGraphNodeMixin):
 
 
 class DefineBoneTransformNode(_BoneTransform):
-    bl_idname = "DefineBoneTransform"
+    bl_idname = "DefineBoneTransformNode"
     bl_label = "Transform Bone"
 
     interpolation: EnumProperty(
@@ -343,7 +343,7 @@ class DefineBoneTransformNode(_BoneTransform):
 
 
 class ReadBoneTransformNode(_BoneTransform):
-    bl_idname = "ReadBoneTransform"
+    bl_idname = "ReadBoneTransformNode"
     bl_label = "Bone Transform"
 
     def update_representation(self, context): self.update()

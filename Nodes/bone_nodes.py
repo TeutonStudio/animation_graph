@@ -38,7 +38,7 @@ class DefineBoneNode(bpy.types.Node, AnimGraphNodeMixin):
     def draw_buttons(self, context, layout): pass
 
 class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
-    bl_idname = "DefineBonePropertieNode"
+    bl_idname = "DefineBonePropertyNode"
     bl_label = "Bone Property"
     bl_icon = "BONE_DATA"
 
@@ -717,7 +717,7 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
         except Exception: pass
 
 class ReadBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
-    bl_idname = "ReadBonePropertieNode"
+    bl_idname = "ReadBonePropertyNode"
     bl_label = "Read Bone Property"
     bl_icon = "BONE_DATA"
 

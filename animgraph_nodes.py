@@ -40,9 +40,9 @@ _NODE_CATEGORIES = [
         items=[
             NodeItem("DefineBoneNode"),
             NodeItem("DefineBoneTransformNode"),
-            NodeItem("DefineBonePropertieNode"),
+            NodeItem("DefineBonePropertyNode"),
             NodeItem("ReadBoneTransformNode"),
-            NodeItem("ReadBonePropertieNode"),
+            NodeItem("ReadBonePropertyNode"),
         ],
     ),
 
