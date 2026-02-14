@@ -49,7 +49,11 @@ class AnimNodeTree(bpy.types.NodeTree):
     def update_node(self,n: bpy.types.Node): pass
 
     def update_link(self,l: bpy.types.NodeLink): 
-        if not sockets.isValidLink(l):
+        try:
+            is_valid = sockets.isValidLink(l)
+        except Exception:
+            is_valid = False
+        if not is_valid:
             try: self.links.remove(l)
             except RuntimeError: pass
 

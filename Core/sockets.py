@@ -146,6 +146,8 @@ def _D(sockettype: str) -> str | None:
 validLinks = {
     "INT":         {"INT"},
     "FLOAT":       {"FLOAT","INT"},
+    "BOOL":        {"BOOL"},
+    "STRING":      {"STRING"},
     "VECTOR":      {"VECTOR","VECTORXYZ","ROTATION","TRANSLATION"},
     "VECTORXYZ":   {"VECTORXYZ","VECTOR"},
     "ROTATION":    {"ROTATION","VECTOR"},
@@ -162,6 +164,14 @@ def isValidLink(l: bpy.types.NodeLink) -> bool:
     except Exception:
         return False
 
+    # Gleichartige Socket-Typen sind immer erlaubt.
+    if vn == zn:
+        return True
+
     allowed = _D(vn)
-    if allowed is None: return vn == zn
-    return _D(zn) in validLinks.get(allowed) or vn == zn
+    target = _D(zn)
+    if allowed is None or target is None:
+        return False
+
+    compatible = validLinks.get(allowed, set())
+    return target in compatible
