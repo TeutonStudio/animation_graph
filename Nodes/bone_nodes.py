@@ -143,14 +143,36 @@ class DefineBonePropertyNode(_BoneProperty):
             start,
             duration,
         )
+        runtime_cache = self._runtime_state_cache()
+        state = ctx.pose_cache.get(cache_key)
+        if state is None:
+            state = runtime_cache.get(cache_key)
 
         if frame < start:
             ctx.pose_cache.pop(cache_key, None)
+            runtime_cache.pop(cache_key, None)
             return
 
         current_value = self._coerce_for_kind(prop_current, kind, prop_current)
         if self._uses_array_value_sockets(kind, current_value):
             current_value = self._array_defaults(kind, current_value)
+        if frame > end_value:
+            if state is not None:
+                last_value = state.get("last_value")
+                start_value = state.get("start_value", current_value)
+                if _values_equal_for_kind(kind, current_value, last_value):
+                    restore_value = self._coerce_for_kind(start_value, kind, start_value)
+                    if self._uses_array_value_sockets(kind, restore_value):
+                        restore_value = self._array_defaults(kind, restore_value)
+                    try:
+                        if self._write_property_value(pbone, spec, restore_value):
+                            ctx.touched_armatures.add(arm_ob)
+                    except Exception:
+                        pass
+            ctx.pose_cache.pop(cache_key, None)
+            runtime_cache.pop(cache_key, None)
+            return
+
         if self._uses_array_value_sockets(kind, current_value):
             target = self._array_target_from_sockets(tree, scene, ctx, kind, current_value)
         else:
@@ -158,12 +180,10 @@ class DefineBonePropertyNode(_BoneProperty):
             raw_target = self.eval_socket(tree, value_socket, scene, ctx) if value_socket else current_value
             target = self._coerce_for_kind(raw_target, kind, current_value)
 
-        state = ctx.pose_cache.get(cache_key)
         if state is None:
             state = {
                 "start_value": _clone_value(current_value),
             }
-            ctx.pose_cache[cache_key] = state
         start_value = state.get("start_value", current_value)
 
         if duration <= 0:
@@ -193,6 +213,9 @@ class DefineBonePropertyNode(_BoneProperty):
 
         try:
             if not self._write_property_value(pbone, spec, value_out): return
+            state["last_value"] = _clone_value(value_out)
+            ctx.pose_cache[cache_key] = state
+            runtime_cache[cache_key] = state
             ctx.touched_armatures.add(arm_ob)
         except Exception: pass
 
@@ -205,6 +228,13 @@ class DefineBonePropertyNode(_BoneProperty):
         pose = getattr(arm_ob, "pose", None)
         if pose is None: return None, ""
         return pose.bones.get(bone_name), bone_name
+
+    def _runtime_state_cache(self):
+        cache = getattr(self, "_runtime_property_state", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            self._runtime_property_state = cache
+        return cache
 
     def _uses_array_value_sockets(self, kind, value=None):
         kind = str(kind or "")
@@ -860,6 +890,49 @@ def _data_block_to_text(value):
     except Exception:
         pass
     return str(value)
+
+
+def _values_equal_for_kind(kind, a, b, tol=1e-6):
+    if b is None:
+        return False
+
+    kind = str(kind or "")
+    try:
+        if kind == "BOOL":
+            return _coerce_bool(a, False) == _coerce_bool(b, False)
+        if kind == "INT":
+            return _coerce_int(a, 0) == _coerce_int(b, 0)
+        if kind == "FLOAT":
+            return abs(_coerce_float(a, 0.0) - _coerce_float(b, 0.0)) <= float(tol)
+        if kind == "STRING":
+            return _coerce_string(a, "") == _coerce_string(b, "")
+
+        if kind in {"BOOL_ARRAY", "INT_ARRAY", "FLOAT_ARRAY"}:
+            aa = _to_sequence(a) or []
+            bb = _to_sequence(b) or []
+            if len(aa) < 3:
+                aa = list(aa) + [0] * (3 - len(aa))
+            if len(bb) < 3:
+                bb = list(bb) + [0] * (3 - len(bb))
+            aa = aa[:3]
+            bb = bb[:3]
+
+            if kind == "BOOL_ARRAY":
+                return [_coerce_bool(v, False) for v in aa] == [_coerce_bool(v, False) for v in bb]
+            if kind == "INT_ARRAY":
+                return [_coerce_int(v, 0) for v in aa] == [_coerce_int(v, 0) for v in bb]
+            return all(abs(_coerce_float(x, 0.0) - _coerce_float(y, 0.0)) <= float(tol) for x, y in zip(aa, bb))
+
+        if kind == "DATA_BLOCK":
+            try:
+                if isinstance(a, bpy.types.ID) and isinstance(b, bpy.types.ID):
+                    return int(a.as_pointer()) == int(b.as_pointer())
+            except Exception:
+                pass
+
+        return a == b
+    except Exception:
+        return False
 
 
 def _lerp_numeric_sequence(start_value, target_value, t):
