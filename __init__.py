@@ -3,7 +3,7 @@
 bl_info = {
     "name": "AnimationGraph",
     "author": "TeutonStudios",
-    "version": (0, 2, 1),
+    "version": (0, 2, 2),
     "blender": (5, 0, 0),
     "category": "Animation",
 }
