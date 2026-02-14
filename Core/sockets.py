@@ -38,7 +38,7 @@ def _on_armature_changed(self, context):
 class NodeSocketBone(bpy.types.NodeSocket):
     bl_idname = "NodeSocketBone"
     bl_label = "Bone"
-    # display_shape = 'SQUARE'
+    display_shape = 'SQUARE'
 
     armature_obj: bpy.props.PointerProperty(
         name="Armature",

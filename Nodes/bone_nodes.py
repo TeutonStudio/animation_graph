@@ -41,7 +41,7 @@ class DefineBoneNode(bpy.types.Node, AnimGraphNodeMixin):
     bl_label = "Bone"
     bl_icon = "BONE_DATA"
 
-    def init(self, context): self.outputs.new("NodeSocketBone","Bone",use_multi_input=False)
+    def init(self, context): self.outputs.new("NodeSocketBone","Bone")
     def draw_buttons(self, context, layout): pass
 
 class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
