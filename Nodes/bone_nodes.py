@@ -716,59 +716,10 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
             ctx.touched_armatures.add(arm_ob)
         except Exception: pass
 
-class ReadBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
+class ReadBonePropertyNode(DefineBonePropertyNode):
     bl_idname = "ReadBonePropertyNode"
     bl_label = "Read Bone Property"
     bl_icon = "BONE_DATA"
-
-    property_name: EnumProperty(
-        name="Property",
-        description="Custom property on the selected/linked pose bone",
-        items=lambda self, context: self._enum_bone_properties(context),
-        update=_on_node_prop_update,
-    )
-
-    def _proxy(self):
-        return DefineBonePropertyNode
-
-    def _pose_bone_ref(self):
-        return self._proxy()._pose_bone_ref(self)
-
-    def _property_items(self):
-        return self._proxy()._property_items(self)
-
-    def _enum_bone_properties(self, context):
-        return self._proxy()._enum_bone_properties(self, context)
-
-    def _property_specs(self):
-        return self._proxy()._property_specs(self)
-
-    def _selected_property_spec(self):
-        return self._proxy()._selected_property_spec(self)
-
-    def _read_property_value(self, pbone, spec):
-        return self._proxy()._read_property_value(self, pbone, spec)
-
-    def _current_property_kind(self):
-        return self._proxy()._current_property_kind(self)
-
-    def _current_property_value(self):
-        return self._proxy()._current_property_value(self)
-
-    def _coerce_for_kind(self, value, kind, fallback):
-        return self._proxy()._coerce_for_kind(self, value, kind, fallback)
-
-    def _socket_type_for_kind(self, kind):
-        return self._proxy()._socket_type_for_kind(kind)
-
-    def _ensure_property_selection(self):
-        return self._proxy()._ensure_property_selection(self)
-
-    def _set_socket_default_for_kind(self, sock, kind, value):
-        return self._proxy()._set_socket_default_for_kind(self, sock, kind, value)
-
-    def _value_as_socket_payload(self, kind, value):
-        return self._proxy()._value_as_socket_payload(self, kind, value)
 
     def _ensure_output_socket(self):
         kind = self._current_property_kind()
