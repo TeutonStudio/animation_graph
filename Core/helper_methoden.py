@@ -240,23 +240,36 @@ def _on_slot_armature_changed(self, context):
 
     _on_action_input_changed(self, context)
 
-def socket_kind(socket_type): return sockets._D(socket_type) if socket_type else "UNSUPPORTED"
-    # socket_type = socket_type or ""
-    # prefix = "NodeSocket"
-    # if socket_type.startswith(prefix):
-    #     return socket_type[len(prefix):]
-    
-    # if socket_type in sockets._SOCKET_BONE or "bone" in socket_type.lower():
-    #     return "BONE"
-    # if socket_type in sockets._SOCKET_INT or "int" in socket_type.lower():
-    #     return "INT"
-    # if socket_type in sockets._SOCKET_FLOAT or "float" in socket_type.lower():
-    #     return "FLOAT"
-    # if socket_type in sockets._SOCKET_MATRIX or "matrix" in socket_type.lower():
-    #     return "MATRIX"
-    # if socket_type in sockets._SOCKET_VECTORS or any(k in socket_type.lower() for k in ("vector", "rotation", "translation")):
-    #     return "VECTOR"
-    # return "UNSUPPORTED"
+def socket_kind(socket_type):
+    raw = sockets._D(socket_type) if socket_type else None
+    if not raw:
+        return "UNSUPPORTED"
+
+    norm = raw.replace("_", "")
+
+    if norm in {"BONE"}:
+        return "BONE"
+    if norm in {"INT"}:
+        return "INT"
+    if norm in {"FLOAT"}:
+        return "FLOAT"
+    if norm in {"MATRIX"}:
+        return "MATRIX"
+    if norm in {"VECTOR", "VECTORXYZ", "ROTATION", "TRANSLATION", "VECTORTRANSLATION"}:
+        return "VECTOR"
+    if norm in {"BOOL"}:
+        return "BOOL"
+    if norm in {"STRING"}:
+        return "STRING"
+
+    if norm.endswith("ARRAY"):
+        base = norm[:-5]
+        if base == "INT":
+            return "INT"
+        if base == "FLOAT":
+            return "FLOAT"
+
+    return raw
 
 def interface_socket_identifier(iface_socket):
     return getattr(iface_socket, "identifier", None) or getattr(iface_socket, "name", None) or ""
@@ -1461,7 +1474,7 @@ def _seed_group_input_runtime_values(tree, group_env, node_cache, stack, group_s
                 continue
 
             for out_sock in getattr(node, "outputs", []):
-                if getattr(out_sock, "bl_idname", "") != "NodeSocketInt":
+                if getattr(out_sock, "bl_idname", "") != sockets._S("INT"):
                     continue
 
                 value = getattr(out_sock, "default_value", 0)

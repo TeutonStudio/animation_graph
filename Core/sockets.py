@@ -162,6 +162,6 @@ def isValidLink(l: bpy.types.NodeLink) -> bool:
     except Exception:
         return False
 
-    allowed = _S(validLinks.get(vn))
+    allowed = _D(vn)
     if allowed is None: return vn == zn
-    return zn in allowed or vn == zn
+    return _D(zn) in validLinks.get(allowed) or vn == zn

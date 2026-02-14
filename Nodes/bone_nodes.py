@@ -55,6 +55,7 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
         items=_enum_bone_property_items,
         update=_on_node_prop_update,
     )
+    _ARRAY_SOCKET_NAMES = ("Value X", "Value Y", "Value Z")
 
     def init(self, context):
         self.inputs.new("NodeSocketBone", "Bone")
@@ -81,8 +82,7 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
         finally:
             self._syncing = False
 
-    def draw_buttons(self, context, layout):
-        layout.prop(self, "property_name")
+    def draw_buttons(self, context, layout): layout.prop(self, "property_name")
 
     def evaluate(self, tree, scene, ctx):
         arm_ob, bone_name = self.socket_bone_ref("Bone")
@@ -134,9 +134,14 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
             return
 
         current_value = self._coerce_for_kind(prop_current, kind, prop_current)
-        value_socket = self.inputs.get("Value")
-        raw_target = self.eval_socket(tree, value_socket, scene, ctx) if value_socket else current_value
-        target = self._coerce_for_kind(raw_target, kind, current_value)
+        if self._uses_array_value_sockets(kind, current_value):
+            current_value = self._array_defaults(kind, current_value)
+        if self._uses_array_value_sockets(kind, current_value):
+            target = self._array_target_from_sockets(tree, scene, ctx, kind, current_value)
+        else:
+            value_socket = self.inputs.get("Value")
+            raw_target = self.eval_socket(tree, value_socket, scene, ctx) if value_socket else current_value
+            target = self._coerce_for_kind(raw_target, kind, current_value)
 
         state = ctx.pose_cache.get(cache_key)
         if state is None:
@@ -161,10 +166,12 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
             value_out = int(round((1.0 - t) * int(start_value) + t * int(target)))
         elif kind == "FLOAT":
             value_out = float((1.0 - t) * float(start_value) + t * float(target))
-        elif kind in {"VECTOR3", "MATRIX16", "ARRAY_NUMERIC"}:
+        elif kind in {"VECTOR3", "MATRIX16", "ARRAY_NUMERIC"} or str(kind).endswith("_ARRAY"):
             value_out = self._lerp_numeric_sequence(start_value, target, t)
             if kind == "VECTOR3":
                 value_out = [float(v) for v in (value_out[:3] if len(value_out) >= 3 else [0.0, 0.0, 0.0])]
+            elif self._uses_array_value_sockets(kind, value_out):
+                value_out = self._array_defaults(kind, value_out)
         elif kind in {"STRING", "JSON"}:
             value_out = self._clone_value(target if t >= 1.0 else start_value)
         else:
@@ -211,24 +218,64 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
 
     @staticmethod
     def _socket_type_for_kind(kind): 
-        kind = kind.removesuffix("_ARRAY")
+        kind = str(kind or "")
+        if not kind:
+            return None
+        if kind.endswith("_ARRAY"):
+            kind = kind.removesuffix("_ARRAY")
         return sockets._S(kind)
-    # TODO wo verwendet überprüfen ob suffix _ARRAY und falls 3 sockets hinzufügen
-        # if kind == "BOOL":
-        #     return "NodeSocketBool"
-        # if kind == "INT":
-        #     return "NodeSocketInt"
-        # if kind == "FLOAT":
-        #     return "NodeSocketFloat"
-        # if kind == "STRING":
-        #     return "NodeSocketString"
-        # if kind == "VECTOR3":
-        #     return "NodeSocketVectorXYZ"
-        # if kind == "MATRIX16":
-        #     return "NodeSocketMatrix"
-        # if kind in {"ARRAY_NUMERIC", "JSON"}:
-        #     return "NodeSocketString"
-        # return None
+
+    def _uses_array_value_sockets(self, kind, value=None):
+        kind = str(kind or "")
+        return kind in {"VECTOR3", "ARRAY_NUMERIC"} or kind.endswith("_ARRAY")
+
+    def _array_socket_type_for_property(self, kind, value):
+        kind = str(kind or "")
+        if kind == "VECTOR3":
+            return sockets._S("FLOAT")
+        if kind.endswith("_ARRAY"):
+            base = kind.removesuffix("_ARRAY")
+            if base == "INT":
+                return sockets._S("INT")
+            if base == "FLOAT":
+                return sockets._S("FLOAT")
+
+        seq = self._to_sequence(value) or []
+        if seq and all(isinstance(v, int) and not isinstance(v, bool) for v in seq):
+            return sockets._S("INT")
+        return sockets._S("FLOAT")
+
+    def _array_defaults(self, kind, value):
+        sock_type = self._array_socket_type_for_property(kind, value)
+        use_int = sock_type == sockets._S("INT")
+
+        if kind == "VECTOR3":
+            seq = list(self._coerce_vector3(value, (0.0, 0.0, 0.0)))
+        else:
+            seq = list(self._to_sequence(value) or [])
+
+        out = []
+        for idx in range(3):
+            raw = seq[idx] if idx < len(seq) else (0 if use_int else 0.0)
+            if use_int:
+                out.append(self._coerce_int(raw, 0))
+            else:
+                out.append(self._coerce_float(raw, 0.0))
+        return out
+
+    def _array_target_from_sockets(self, tree, scene, ctx, kind, fallback):
+        defaults = self._array_defaults(kind, fallback)
+        use_int = self._array_socket_type_for_property(kind, fallback) == sockets._S("INT")
+
+        out = []
+        for idx, name in enumerate(self._ARRAY_SOCKET_NAMES):
+            sock = self.inputs.get(name)
+            raw_value = self.eval_socket(tree, sock, scene, ctx) if sock is not None else defaults[idx]
+            if use_int:
+                out.append(self._coerce_int(raw_value, defaults[idx]))
+            else:
+                out.append(self._coerce_float(raw_value, defaults[idx]))
+        return out
 
     @staticmethod
     def _is_number(value):
@@ -651,6 +698,8 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
             return self._coerce_matrix16(value, fallback)
         if kind == "ARRAY_NUMERIC":
             return self._coerce_numeric_array(value, fallback)
+        if str(kind).endswith("_ARRAY"):
+            return self._array_defaults(kind, value if value is not None else fallback)
         if kind == "JSON":
             return self._coerce_json(value, fallback)
         return fallback
@@ -673,27 +722,58 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
 
     def _ensure_value_socket(self):
         kind = self._current_property_kind()
-        wanted_type = self._socket_type_for_kind(kind)
-        current_socket = self.inputs.get("Value")
+        prop_value = self._current_property_value()
 
-        if wanted_type is None:
-            if current_socket is not None:
+        if self._uses_array_value_sockets(kind, prop_value):
+            comp_type = self._array_socket_type_for_property(kind, prop_value)
+            wanted = [(name, comp_type) for name in self._ARRAY_SOCKET_NAMES]
+        else:
+            wanted_type = self._socket_type_for_kind(kind)
+            wanted = [("Value", wanted_type)] if wanted_type else []
+
+        dynamic_names = {"Value", *self._ARRAY_SOCKET_NAMES}
+        wanted_by_name = {name: sock_type for name, sock_type in wanted}
+        kept = set()
+
+        for sock in list(self.inputs):
+            name = str(getattr(sock, "name", "") or "")
+            if name not in dynamic_names:
+                continue
+
+            sock_type = wanted_by_name.get(name)
+            keep = (
+                sock_type is not None
+                and getattr(sock, "bl_idname", "") == sock_type
+                and name not in kept
+            )
+            if keep:
+                kept.add(name)
+                continue
+
+            try:
+                self.inputs.remove(sock)
+            except Exception:
+                pass
+
+        if self._uses_array_value_sockets(kind, prop_value):
+            defaults = self._array_defaults(kind, prop_value)
+            for idx, (name, sock_type) in enumerate(wanted):
+                sock = self.inputs.get(name)
+                if sock is not None:
+                    continue
+                sock = self.inputs.new(sock_type, name)
                 try:
-                    self.inputs.remove(current_socket)
+                    sock.default_value = defaults[idx]
                 except Exception:
                     pass
             return
 
-        if current_socket is not None and getattr(current_socket, "bl_idname", "") != wanted_type:
-            try:
-                self.inputs.remove(current_socket)
-            except Exception:
-                pass
-            current_socket = None
+        if not wanted:
+            return
 
+        current_socket = self.inputs.get("Value")
         if current_socket is None:
-            current_socket = self.inputs.new(wanted_type, "Value")
-            prop_value = self._current_property_value()
+            current_socket = self.inputs.new(wanted[0][1], "Value")
             self._set_socket_default_for_kind(current_socket, kind, prop_value)
 
     def _value_as_socket_payload(self, kind, value):
@@ -727,6 +807,65 @@ class ReadBonePropertyNode(DefineBonePropertyNode):
     bl_idname = "ReadBonePropertyNode"
     bl_label = "Read Bone Property"
     bl_icon = "BONE_DATA"
+
+    def init(self, context):
+        self.inputs.new("NodeSocketBone", "Bone")
+        frame = self.inputs.new("NodeSocketInt", "Frame")
+        try:
+            frame.default_value = 0
+        except Exception:
+            pass
+        self.outputs.new("NodeSocketFloat", "Value")
+        self.update()
+
+    def update(self):
+        if getattr(self, "_syncing", False):
+            return
+
+        self._syncing = True
+        try:
+            self._ensure_property_selection()
+            self._ensure_output_socket()
+        finally:
+            self._syncing = False
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "property_name", text="")
+
+    def evaluate(self, tree, scene, ctx):
+        arm_ob, bone_name = self.socket_bone_ref("Bone")
+        if not arm_ob or getattr(arm_ob, "type", "") != "ARMATURE" or not bone_name:
+            return
+
+        pbone = arm_ob.pose.bones.get(bone_name)
+        if not pbone:
+            return
+
+        spec = self._selected_property_spec()
+        if spec is None:
+            return
+
+        kind = str(spec.get("kind", "") or "")
+        if not kind:
+            return
+
+        value_raw = self._read_property_value(pbone, spec)
+        if value_raw is None:
+            return
+
+        value = self._coerce_for_kind(value_raw, kind, value_raw)
+        frame_in = int(self.socket_int(tree, "Frame", scene, ctx, int(scene.frame_current)))
+        cur_frame = int(scene.frame_current)
+        if frame_in != cur_frame:
+            value = self._sample_property_from_action(arm_ob, bone_name, spec, kind, frame_in, value)
+
+        payload = self._value_as_socket_payload(kind, value)
+
+        out = self.outputs.get("Value")
+        if out:
+            self._set_socket_default_for_kind(out, kind, value)
+
+        self.set_output_value(ctx, "Value", payload)
 
     def _property_data_path(self, bone_name, spec):
         key = str(spec.get("key", "") or "")
@@ -841,65 +980,6 @@ class ReadBonePropertyNode(DefineBonePropertyNode):
 
         prop_value = self._current_property_value()
         self._set_socket_default_for_kind(current_socket, kind, prop_value)
-
-    def init(self, context):
-        self.inputs.new("NodeSocketBone", "Bone")
-        frame = self.inputs.new("NodeSocketInt", "Frame")
-        try:
-            frame.default_value = 0
-        except Exception:
-            pass
-        self.outputs.new("NodeSocketFloat", "Value")
-        self.update()
-
-    def update(self):
-        if getattr(self, "_syncing", False):
-            return
-
-        self._syncing = True
-        try:
-            self._ensure_property_selection()
-            self._ensure_output_socket()
-        finally:
-            self._syncing = False
-
-    def draw_buttons(self, context, layout):
-        layout.prop(self, "property_name", text="")
-
-    def evaluate(self, tree, scene, ctx):
-        arm_ob, bone_name = self.socket_bone_ref("Bone")
-        if not arm_ob or getattr(arm_ob, "type", "") != "ARMATURE" or not bone_name:
-            return
-
-        pbone = arm_ob.pose.bones.get(bone_name)
-        if not pbone:
-            return
-
-        spec = self._selected_property_spec()
-        if spec is None:
-            return
-
-        kind = str(spec.get("kind", "") or "")
-        if not kind:
-            return
-
-        value_raw = self._read_property_value(pbone, spec)
-        if value_raw is None:
-            return
-
-        value = self._coerce_for_kind(value_raw, kind, value_raw)
-        frame_in = int(self.socket_int(tree, "Frame", scene, ctx, int(scene.frame_current)))
-        cur_frame = int(scene.frame_current)
-        if frame_in != cur_frame:
-            value = self._sample_property_from_action(arm_ob, bone_name, spec, kind, frame_in, value)
-
-        payload = self._value_as_socket_payload(kind, value)
-
-        out = self.outputs.get("Value")
-        if out:
-            self._set_socket_default_for_kind(out, kind, value)
-
-        self.set_output_value(ctx, "Value", payload)
 
 
 _CLASSES = [
