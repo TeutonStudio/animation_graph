@@ -16,6 +16,18 @@ def _get_space_node_editor(context):
     space = context.space_data
     return space if isinstance(space, bpy.types.SpaceNodeEditor) else None
 
+# TODO implementieren
+class ANIMGRAPH_OT_make_group(Operator):
+    bl_idname = "animgraph.make_group"
+    bl_label = "Enter AnimGraph Group"
+
+    # TODO Selektierte Nodes ermitteln
+    # TODO Selektierte Nodes in neuen AnimNodeTree
+    # TODO verbindungen von selektierten zu unselektierten Node als Ein- und AusgangsSocket des neuen AnimNodeTree definieren
+    # TODO AnimNodeGroup mit neuem AnimNodeTree erstellen
+    # TODO Verbindungen von unselektierten zu Selektierten Node an AnimNodeGroup verlegen
+
+
 class ANIMGRAPH_OT_enter_group(Operator):
     """Enter AnimGraph group tree and update breadcrumbs."""
     bl_idname = "animgraph.enter_group"

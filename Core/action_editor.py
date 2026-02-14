@@ -12,9 +12,9 @@ def register():
         type=AnimGraphActionInputValue,
     )
 def unregister(): 
-    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
     if hasattr(bpy.types.Action, "animgraph_input_values"):
         del bpy.types.Action.animgraph_input_values
+    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
 
 
 

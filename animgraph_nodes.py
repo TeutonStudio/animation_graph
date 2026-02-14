@@ -33,7 +33,7 @@ class AnimGraphNodeCategory(NodeCategory):
 
 
 _NODE_CATS_ID = "ANIMGRAPH_NODE_CATEGORIES"
-_NODE_CATEGORIES = [
+_NODE_CATEGORIES = [ # TODO Kontext Menü überarbeiten; Kompatibilität mit NodePieMenu erhalten
     AnimGraphNodeCategory(
         "ANIMGRAPH_RIGGRAPH",
         "RigGraph",

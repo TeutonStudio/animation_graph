@@ -26,9 +26,9 @@ def register():
         update=_on_action_tree_changed,
     )
 def unregister(): 
-    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
     if hasattr(bpy.types.Action, "animgraph_tree"):
         del bpy.types.Action.animgraph_tree
+    for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
 
 class AnimNodeTree(bpy.types.NodeTree):
     """AnimGraph node tree."""

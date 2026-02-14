@@ -29,12 +29,19 @@ def _on_node_prop_update(self, context):
     except Exception: pass
 
 
+def _enum_bone_property_items(self, context):
+    try:
+        return self._property_items()
+    except Exception:
+        return [("", "(select bone first)", "Pick a linked/selected bone first.")]
+
+
 class DefineBoneNode(bpy.types.Node, AnimGraphNodeMixin):
     bl_idname = "DefineBoneNode"
     bl_label = "Bone"
     bl_icon = "BONE_DATA"
 
-    def init(self, context): self.outputs.new("NodeSocketBone","Bone")
+    def init(self, context): self.outputs.new("NodeSocketBone","Bone",use_multi_input=False)
     def draw_buttons(self, context, layout): pass
 
 class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
@@ -45,7 +52,7 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
     property_name: EnumProperty(
         name="Property",
         description="Property on the selected/linked pose bone",
-        items=lambda self, context: self._enum_bone_properties(context),
+        items=_enum_bone_property_items,
         update=_on_node_prop_update,
     )
 
@@ -376,9 +383,6 @@ class DefineBonePropertyNode(bpy.types.Node, AnimGraphNodeMixin):
         if not specs:
             return [("", "(no custom properties)", "No custom properties found on this bone.")]
         return [(spec["id"], spec["label"], spec["description"]) for spec in specs]
-
-    def _enum_bone_properties(self, context):
-        return self._property_items()
 
     def _property_specs(self):
         pbone, _ = self._pose_bone_ref()
