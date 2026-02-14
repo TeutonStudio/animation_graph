@@ -138,7 +138,7 @@ def _apply_action_inputs_to_group_inputs(tree, action, ctx=None):
 
 def _evaluate_tree(tree, action, scene, ctx):
     """
-    Kick off evaluation. We only "tick" transform nodes.
+    Kick off evaluation. We tick transform nodes and group nodes.
     Everything else is pulled via upstream evaluation when sockets are read.
     """
     _apply_action_inputs_to_group_inputs(tree, action, ctx)
@@ -150,6 +150,25 @@ def _evaluate_tree(tree, action, scene, ctx):
             continue
 
         # Fallback: call evaluate directly if present
+        fn = getattr(n, "evaluate", None)
+        if callable(fn):
+            fn(tree, scene, ctx)
+
+    for n in _find_nodes(tree, "DefineBonePropertieNode"):
+        if hasattr(n, "eval_upstream"):
+            n.eval_upstream(tree, scene, ctx)
+            continue
+
+        fn = getattr(n, "evaluate", None)
+        if callable(fn):
+            fn(tree, scene, ctx)
+
+    # Group nodes can contain side-effect transform nodes and must also tick per frame.
+    for n in _find_nodes(tree, "AnimNodeGroup"):
+        if hasattr(n, "eval_upstream"):
+            n.eval_upstream(tree, scene, ctx)
+            continue
+
         fn = getattr(n, "evaluate", None)
         if callable(fn):
             fn(tree, scene, ctx)

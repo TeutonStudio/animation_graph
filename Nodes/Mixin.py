@@ -3,11 +3,6 @@
 import bpy
 from mathutils import Vector, Matrix
 
-# animation_graph/Nodes/Mixin.py
-
-import bpy
-from mathutils import Vector, Matrix
-
 class AnimGraphNodeMixin:
     """
     Evaluations-Mixin (single-link MVP, aber deterministisch):
@@ -23,9 +18,20 @@ class AnimGraphNodeMixin:
     # -----------------------------
     # internal helpers
     # -----------------------------
+    def _scene_time_key(self, scene):
+        # Include subframe to distinguish evaluation at the same integer frame.
+        try:
+            return round(float(getattr(scene, "frame_current_final")), 6)
+        except Exception:
+            try:
+                base = float(getattr(scene, "frame_current", 0.0))
+                sub = float(getattr(scene, "frame_subframe", 0.0))
+                return round(base + sub, 6)
+            except Exception:
+                return 0.0
+
     def _frame_key(self, tree, scene):
-        # Frame als int, damit es keine Float-Schlenker gibt
-        return (tree.as_pointer(), int(scene.frame_current))
+        return (tree.as_pointer(), self._scene_time_key(scene))
 
     def _out_key(self, sock_name: str):
         # Schlüssel, unter dem Outputs im ctx.values landen
@@ -58,12 +64,13 @@ class AnimGraphNodeMixin:
         """
         self._ensure_ctx_runtime(ctx)
 
-        key = (tree.as_pointer(), self.as_pointer(), int(scene.frame_current))
+        frame_key = self._frame_key(tree, scene)
+        key = (self.as_pointer(), frame_key)
         if key in ctx.eval_cache:
             return
 
         # Protect direct eval_upstream callers that bypass eval_socket guards.
-        guard = ("UPSTREAM_EVAL", tree.as_pointer(), self.as_pointer(), int(scene.frame_current))
+        guard = ("UPSTREAM_EVAL", self.as_pointer(), frame_key)
         if guard in ctx.eval_stack:
             return
         ctx.eval_stack.add(guard)
@@ -93,7 +100,7 @@ class AnimGraphNodeMixin:
             from_node = from_sock.node
 
             # recursion guard (cycles kill determinism)
-            guard = (tree.as_pointer(), from_node.as_pointer(), int(scene.frame_current))
+            guard = (tree.as_pointer(), from_node.as_pointer(), self._scene_time_key(scene))
             if guard in ctx.eval_stack:
                 return getattr(from_sock, "default_value", None)  # last resort
             ctx.eval_stack.add(guard)

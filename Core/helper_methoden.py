@@ -1352,15 +1352,145 @@ def _fcurve_key_frames(fcurve):
     return sorted(set(out))
 
 
-def _resolve_int_input(sock, node_cache, stack):
+def _group_env_key(group_env):
+    if not group_env:
+        return ()
+
+    out = []
+    cur = group_env
+    while cur:
+        node = cur.get("group_node")
+        out.append(_pointer_uid(node) if node is not None else None)
+        cur = cur.get("parent_env")
+    return tuple(out)
+
+
+def _socket_index(sockets, needle):
+    if sockets is None:
+        return -1
+
+    try:
+        iterator = iter(sockets)
+    except Exception:
+        return -1
+
+    for idx, sock in enumerate(iterator):
+        if sock == needle:
+            return idx
+        try:
+            if sock.as_pointer() == needle.as_pointer():
+                return idx
+        except Exception:
+            pass
+    return -1
+
+
+def _active_group_output_node(tree):
+    outputs = [n for n in getattr(tree, "nodes", []) if getattr(n, "type", "") == "GROUP_OUTPUT"]
+    if not outputs:
+        return None
+    for node in outputs:
+        if getattr(node, "is_active_output", False):
+            return node
+    return outputs[0]
+
+
+def _resolve_group_input_source(group_input_node, from_sock, group_env):
+    if not group_env:
+        return (None, None)
+
+    group_node = group_env.get("group_node")
+    if group_node is None:
+        return (None, None)
+
+    idx = _socket_index(getattr(group_input_node, "outputs", []), from_sock)
+    if idx < 0:
+        return (None, None)
+
+    group_inputs = getattr(group_node, "inputs", [])
+    if idx >= len(group_inputs):
+        return (None, None)
+
+    return (group_inputs[idx], group_env.get("parent_env"))
+
+
+def _resolve_group_output_source(group_node, from_sock, group_env):
+    subtree = getattr(group_node, "node_tree", None)
+    if not subtree or getattr(subtree, "bl_idname", "") != "AnimNodeTree":
+        return (None, None)
+
+    out_idx = _socket_index(getattr(group_node, "outputs", []), from_sock)
+    if out_idx < 0:
+        return (None, None)
+
+    group_output = _active_group_output_node(subtree)
+    if group_output is None:
+        return (None, None)
+
+    group_output_inputs = getattr(group_output, "inputs", [])
+    if out_idx >= len(group_output_inputs):
+        return (None, None)
+
+    sub_in = group_output_inputs[out_idx]
+    sub_env = {"group_node": group_node, "parent_env": group_env}
+    return (sub_in, sub_env)
+
+
+def _resolve_int_input(sock, node_cache, stack, group_env=None, group_stack=None):
     if sock is None:
         return 0
+
+    if group_stack is None:
+        group_stack = set()
 
     if getattr(sock, "is_linked", False) and sock.links:
         from_sock = sock.links[0].from_socket
         node = getattr(from_sock, "node", None)
-        if node and getattr(node, "bl_idname", "") == "DefineBoneTransform" and from_sock.name == "End":
-            return _resolve_transform_end(node, node_cache, stack)
+
+        if (
+            node
+            and getattr(node, "bl_idname", "") in {"DefineBoneTransform", "DefineBonePropertieNode"}
+            and from_sock.name == "End"
+        ):
+            return _resolve_transform_end(
+                node,
+                node_cache,
+                stack,
+                group_env=group_env,
+                group_stack=group_stack,
+            )
+
+        if node and getattr(node, "type", "") == "GROUP_INPUT":
+            parent_sock, parent_env = _resolve_group_input_source(node, from_sock, group_env)
+            if parent_sock is not None:
+                return _resolve_int_input(
+                    parent_sock,
+                    node_cache,
+                    stack,
+                    group_env=parent_env,
+                    group_stack=group_stack,
+                )
+
+        if node and getattr(node, "bl_idname", "") == "AnimNodeGroup":
+            guard = (
+                _pointer_uid(node),
+                getattr(from_sock, "name", ""),
+                _group_env_key(group_env),
+            )
+            if guard not in group_stack:
+                group_stack.add(guard)
+                try:
+                    sub_sock, sub_env = _resolve_group_output_source(node, from_sock, group_env)
+                    if sub_sock is not None:
+                        return _resolve_int_input(
+                            sub_sock,
+                            node_cache,
+                            stack,
+                            group_env=sub_env,
+                            group_stack=group_stack,
+                        )
+                finally:
+                    group_stack.discard(guard)
 
         try:
             return int(round(float(getattr(from_sock, "default_value", 0))))
@@ -1373,26 +1503,94 @@ def _resolve_int_input(sock, node_cache, stack):
         return 0
 
 
-def _resolve_transform_end(node, node_cache, stack):
-    node_ptr = node.as_pointer()
-    if node_ptr in node_cache:
-        return node_cache[node_ptr]
-    if node_ptr in stack:
+def _resolve_transform_end(node, node_cache, stack, group_env=None, group_stack=None):
+    cache_key = (_pointer_uid(node), _group_env_key(group_env))
+    if cache_key in node_cache:
+        return node_cache[cache_key]
+    if cache_key in stack:
         try:
             return int(round(float(getattr(node.outputs.get("End"), "default_value", 0))))
         except Exception:
             return 0
 
-    stack.add(node_ptr)
+    stack.add(cache_key)
     try:
-        start = _resolve_int_input(node.inputs.get("Start"), node_cache, stack)
-        duration = _resolve_int_input(node.inputs.get("Duration"), node_cache, stack)
+        start = _resolve_int_input(
+            node.inputs.get("Start"),
+            node_cache,
+            stack,
+            group_env=group_env,
+            group_stack=group_stack,
+        )
+        duration = _resolve_int_input(
+            node.inputs.get("Duration"),
+            node_cache,
+            stack,
+            group_env=group_env,
+            group_stack=group_stack,
+        )
         end_value = int(start + max(0, duration))
     finally:
-        stack.discard(node_ptr)
+        stack.discard(cache_key)
 
-    node_cache[node_ptr] = end_value
+    node_cache[cache_key] = end_value
     return end_value
+
+
+def _collect_tree_timekeys_recursive(tree, keys, node_cache, stack, tree_stack, group_env=None, group_stack=None):
+    if tree is None:
+        return
+
+    tree_uid = _pointer_uid(tree)
+    if tree_uid is None:
+        tree_uid = id(tree)
+    if tree_uid in tree_stack:
+        return
+    tree_stack.add(tree_uid)
+
+    try:
+        for node in getattr(tree, "nodes", []):
+            bl_idname = getattr(node, "bl_idname", "")
+            if bl_idname in {"DefineBoneTransform", "DefineBonePropertieNode"}:
+                start = _resolve_int_input(
+                    node.inputs.get("Start"),
+                    node_cache,
+                    stack,
+                    group_env=group_env,
+                    group_stack=group_stack,
+                )
+                duration = _resolve_int_input(
+                    node.inputs.get("Duration"),
+                    node_cache,
+                    stack,
+                    group_env=group_env,
+                    group_stack=group_stack,
+                )
+                end_value = int(start + max(0, duration))
+
+                keys.add(int(start))
+                keys.add(int(end_value))
+                continue
+
+            if bl_idname != "AnimNodeGroup":
+                continue
+
+            subtree = getattr(node, "node_tree", None)
+            if not subtree or getattr(subtree, "bl_idname", "") != "AnimNodeTree":
+                continue
+
+            sub_env = {"group_node": node, "parent_env": group_env}
+            _collect_tree_timekeys_recursive(
+                subtree,
+                keys,
+                node_cache,
+                stack,
+                tree_stack,
+                group_env=sub_env,
+                group_stack=group_stack,
+            )
+    finally:
+        tree_stack.discard(tree_uid)
 
 
 def collect_tree_timekeys(tree):
@@ -1402,17 +1600,18 @@ def collect_tree_timekeys(tree):
     keys = set()
     node_cache = {}
     stack = set()
+    tree_stack = set()
+    group_stack = set()
 
-    for node in getattr(tree, "nodes", []):
-        if getattr(node, "bl_idname", "") != "DefineBoneTransform":
-            continue
-
-        start = _resolve_int_input(node.inputs.get("Start"), node_cache, stack)
-        duration = _resolve_int_input(node.inputs.get("Duration"), node_cache, stack)
-        end_value = int(start + max(0, duration))
-
-        keys.add(int(start))
-        keys.add(int(end_value))
+    _collect_tree_timekeys_recursive(
+        tree,
+        keys,
+        node_cache,
+        stack,
+        tree_stack,
+        group_env=None,
+        group_stack=group_stack,
+    )
 
     return sorted(keys)
 
@@ -1572,4 +1771,3 @@ def build_action_input_value_map(action, tree):
         sock_name = getattr(iface_socket, "name", ident)
         values[sock_name] = value
     return values
-

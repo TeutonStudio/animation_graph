@@ -9,8 +9,6 @@ from .Mixin import AnimGraphNodeMixin
 _SOCKET_SYNC_GUARDS = set()
 _ENSURE_IO_GUARDS = set()
 
-# TODO evalueirung und framekey erzeugung funktionieren nicht
-
 class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
     """AnimGraph group instance node."""
 
@@ -77,8 +75,10 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
             stack = set()
             ctx.eval_stack = stack
 
+        frame_key = self._frame_key(tree, scene)
+
         # Guard against recursive group re-entry across nested sub-contexts.
-        group_guard = ("GROUP_EVAL", tree.as_pointer(), self.as_pointer(), int(scene.frame_current))
+        group_guard = ("GROUP_EVAL", self.as_pointer(), frame_key)
         if group_guard in stack:
             return
         stack.add(group_guard)
@@ -96,6 +96,10 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
                 parent_ctx=ctx,
                 sub_ctx=sub_ctx,
             )
+
+            # Tick side-effect transform nodes explicitly, like top-level tree eval.
+            _evaluate_subtree_terminal_nodes(sub, scene, sub_ctx)
+
             _pull_group_outputs_from_subtree(
                 group_node=self,
                 subtree=sub,
@@ -105,6 +109,27 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
             )
         finally:
             stack.discard(group_guard)
+
+
+def _evaluate_subtree_terminal_nodes(subtree, scene, sub_ctx):
+    for node in getattr(subtree, "nodes", []):
+        bl_idname = getattr(node, "bl_idname", "")
+        if bl_idname not in {"DefineBoneTransform", "AnimNodeGroup"}:
+            continue
+
+        if hasattr(node, "eval_upstream"):
+            try:
+                node.eval_upstream(subtree, scene, sub_ctx)
+            except Exception:
+                pass
+            continue
+
+        fn = getattr(node, "evaluate", None)
+        if callable(fn):
+            try:
+                fn(subtree, scene, sub_ctx)
+            except Exception:
+                pass
 
 def _guard_key(rna):
     try:
