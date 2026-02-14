@@ -151,7 +151,7 @@ class _BoneTransform(Node, AnimGraphNodeMixin):
         col.prop(self, "apply_mode", text="")
 
 
-class DefineBoneTransform(_BoneTransform):
+class DefineBoneTransformNode(_BoneTransform):
     bl_idname = "DefineBoneTransform"
     bl_label = "Transform Bone"
 
@@ -342,7 +342,7 @@ class DefineBoneTransform(_BoneTransform):
         ctx.touched_armatures.add(arm_ob)
 
 
-class ReadBoneTransform(_BoneTransform):
+class ReadBoneTransformNode(_BoneTransform):
     bl_idname = "ReadBoneTransform"
     bl_label = "Bone Transform"
 
@@ -465,6 +465,6 @@ class ReadBoneTransform(_BoneTransform):
                 out_r.default_value = (0.0, 0.0, 0.0)
 
 _CLASSES = [
-    DefineBoneTransform,
-    ReadBoneTransform,
+    DefineBoneTransformNode,
+    ReadBoneTransformNode,
 ]

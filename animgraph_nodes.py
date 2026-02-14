@@ -39,9 +39,9 @@ _NODE_CATEGORIES = [
         "RigGraph",
         items=[
             NodeItem("DefineBoneNode"),
-            NodeItem("DefineBoneTransform"),
+            NodeItem("DefineBoneTransformNode"),
             NodeItem("DefineBonePropertieNode"),
-            NodeItem("ReadBoneTransform"),
+            NodeItem("ReadBoneTransformNode"),
         ],
     ),
 
