@@ -2,9 +2,8 @@
 
 import bpy
 from nodeitems_utils import NodeCategory, NodeItem, register_node_categories, unregister_node_categories
-from .Nodes import mathe_nodes, iteration_nodes, bone_transform_nodes
+from .Nodes import bone_nodes, mathe_nodes, iteration_nodes, bone_transform_nodes
 from .Nodes.group_node import AnimNodeGroup
-from .Nodes.bone_node import DefineBoneNode, DefineBonePropertieNode
 
 
 # --------------------------------------------------------------------
@@ -12,6 +11,7 @@ from .Nodes.bone_node import DefineBoneNode, DefineBonePropertieNode
 # --------------------------------------------------------------------
 _MODULES = [
     mathe_nodes,
+    bone_nodes,
     iteration_nodes,
     bone_transform_nodes,
 ]
@@ -42,6 +42,7 @@ _NODE_CATEGORIES = [
             NodeItem("DefineBoneTransformNode"),
             NodeItem("DefineBonePropertieNode"),
             NodeItem("ReadBoneTransformNode"),
+            NodeItem("ReadBonePropertieNode"),
         ],
     ),
 
@@ -94,6 +95,4 @@ _NODE_CATEGORIES = [
 
 _CLASSES = (
     AnimNodeGroup,
-    DefineBoneNode,
-    DefineBonePropertieNode,
 )
