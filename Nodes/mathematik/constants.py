@@ -54,7 +54,7 @@ class RotationConst(Node, AnimGraphNodeMixin):
 
 class TranslationConst(Node, AnimGraphNodeMixin):
     bl_idname = "TranslationConst"
-    bl_label = "Constant (Rotation)"
+    bl_label = "Constant (Translation)"
     bl_icon = "EMPTY_AXIS"
 
     def init(self, context):

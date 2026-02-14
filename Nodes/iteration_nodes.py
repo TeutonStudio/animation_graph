@@ -27,10 +27,8 @@ class AnimNodeRepeatInput(bpy.types.Node, AnimGraphNodeMixin):
 
     def init(self, context):
         initial = self.inputs.new("NodeSocketInt", "Initial")
-        try:
-            initial.default_value = 0
-        except Exception:
-            pass
+        try: initial.default_value = 0
+        except Exception: pass
 
         self.outputs.new("NodeSocketInt", "Value")
         self.outputs.new("NodeSocketInt", "Index")

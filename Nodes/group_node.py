@@ -9,13 +9,7 @@ from .Mixin import AnimGraphNodeMixin
 _SOCKET_SYNC_GUARDS = set()
 _ENSURE_IO_GUARDS = set()
 
-
-def _guard_key(rna):
-    try:
-        return int(rna.as_pointer())
-    except Exception:
-        return id(rna)
-
+# TODO evalueirung und framekey erzeugung funktionieren nicht
 
 class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
     """AnimGraph group instance node."""
@@ -111,6 +105,13 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
             )
         finally:
             stack.discard(group_guard)
+
+def _guard_key(rna):
+    try:
+        return int(rna.as_pointer())
+    except Exception:
+        return id(rna)
+
 
 
 def _iter_interface_sockets(subtree, want_in_out):
