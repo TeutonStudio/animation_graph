@@ -39,12 +39,25 @@ class ANIMGRAPH_OT_enter_group(Operator):
         space = _get_space_node_editor(context)
         if not space: return {'CANCELLED'}
 
-        tree = space.edit_tree  # aktuell editierter Tree (readonly)
+        tree = getattr(space, 'edit_tree', None) or getattr(space, 'node_tree', None)  # edit_tree kann None sein, fallback auf node_tree
         node = tree.nodes.get(self.node_name) if tree else None
         if not node or not getattr(node, "node_tree", None):
             return {'CANCELLED'}
 
         subgroup = node.node_tree
+        # Debug logging: print state to Blender console to diagnose breadcrumb issues
+        try:
+            print("[animgraph] enter_group: space=", type(space), "area_type=", getattr(context.area, 'type', None))
+            print("[animgraph] enter_group: edit_tree=", getattr(tree, 'name', None), "bl_idname=", getattr(tree, 'bl_idname', None))
+            print("[animgraph] enter_group: node=", getattr(node, 'name', None), "node_tree=", getattr(subgroup, 'name', None))
+            print("[animgraph] enter_group: space.node_tree before=", getattr(space, 'node_tree', None))
+            print("[animgraph] enter_group: space.path length before=", len(getattr(space, 'path', [])))
+            try:
+                print("[animgraph] enter_group: path items=", [(getattr(p, 'node_tree', None), getattr(p, 'node', None)) for p in list(getattr(space, 'path', []))])
+            except Exception:
+                pass
+        except Exception:
+            pass
         try:
             from ..Nodes.group_node import ensure_group_io_nodes
             ensure_group_io_nodes(subgroup)
@@ -54,6 +67,12 @@ class ANIMGRAPH_OT_enter_group(Operator):
         if len(space.path) == 0: space.path.start(tree) 
         space.path.append(subgroup, node=node)
         space.node_tree = subgroup
+
+        try:
+            print("[animgraph] enter_group: space.node_tree after=", getattr(space, 'node_tree', None))
+            print("[animgraph] enter_group: space.path length after=", len(getattr(space, 'path', [])))
+        except Exception:
+            pass
 
         return {'FINISHED'}
 
