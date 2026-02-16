@@ -17,23 +17,19 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
     bl_icon = "NODETREE"
 
     @classmethod
-    def poll(cls, ntree): return getattr(ntree, "bl_idname", None) == "AnimNodeTree"
+    def poll(cls, node_tree): return getattr(node_tree, "bl_idname", None) == "AnimNodeTree"
     def init(self, context):
-        if self.node_tree is None:
-            self.node_tree = bpy.data.node_groups.new(
-                name="AnimGraphGroup",
-                type="AnimNodeTree",
-            )
-
-        ensure_group_io_nodes(self.node_tree)
+        ensure_group_io_nodes(self.erhalteSubtree())
         self.sync_sockets_from_subtree()
 
+
     def update(self):
-        if self.node_tree:
-            ensure_group_io_nodes(self.node_tree)
+        ensure_group_io_nodes(self.erhalteSubtree())
         self.sync_sockets_from_subtree()
 
     def draw_buttons(self, context, layout):
+        if not layout: return
+        
         layout.template_ID(self, "node_tree", new="node.new_node_tree")
 
         row = layout.row(align=True)
@@ -43,6 +39,17 @@ class AnimNodeGroup(bpy.types.NodeCustomGroup, AnimGraphNodeMixin):
             icon="FULLSCREEN_ENTER",
         )
         op.node_name = self.name
+
+    def erhalteSubtree(self) -> bpy.types.NodeTree:
+        subtree = self.node_tree
+        if subtree is None:
+            subtree = bpy.data.node_groups.new(
+                name="AnimGraphGroup",
+                type="AnimNodeTree",
+            )
+            self.node_tree = subtree
+        return subtree
+
 
     def sync_sockets_from_subtree(self):
         node_key = _guard_key(self)

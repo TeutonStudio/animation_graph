@@ -79,7 +79,7 @@ def _iter_active_action_trees(scene):
         action = getattr(ad, "action", None) if ad else None
         tree = getattr(action, "animgraph_tree", None) if action else None
 
-        if not tree or getattr(tree, "bl_idname", "") != "AnimNodeTree":
+        if not action or not tree or getattr(tree, "bl_idname", "") != "AnimNodeTree":
             continue
 
         key = (tree.as_pointer(), action.as_pointer())

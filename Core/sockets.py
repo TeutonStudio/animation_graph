@@ -55,6 +55,7 @@ class NodeSocketBone(bpy.types.NodeSocket):
     )
 
     def draw(self, context, layout, node, text):
+        if not layout: return
         # Socket-Label links im UI
         if text:
             layout.label(text=text)
@@ -96,7 +97,7 @@ class NodeSocketBone(bpy.types.NodeSocket):
         row.enabled = bool(arm_obj and arm_obj.type == "ARMATURE" and arm_obj.data)
         row.prop(self, "bone_name", text="")
 
-    def draw_color(self, context, node):
+    def draw_color(self, context, node) -> tuple[float, float, float, float]:
         return (0.8, 0.7, 0.2, 1.0)
 
 _SOCKET_PREFIX = "NodeSocket"
@@ -159,6 +160,7 @@ def isValidLink(l: bpy.types.NodeLink) -> bool:
     try:
         from_sock = l.from_socket
         to_sock = l.to_socket
+        if not from_sock or not to_sock: return False
         vn = from_sock.bl_idname
         zn = to_sock.bl_idname
     except Exception:

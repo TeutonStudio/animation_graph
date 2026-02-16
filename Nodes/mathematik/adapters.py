@@ -1,7 +1,6 @@
 # animation_graph/Nodes/mathematik/adapters.py
 
 import bpy
-from bpy.types import Node
 from mathutils import Vector, Matrix, Euler
 
 from ..Mixin import AnimGraphNodeMixin
@@ -12,7 +11,7 @@ def register():
 def unregister():
     for c in reversed(_ADAPTERS): bpy.utils.unregister_class(c)
 
-class CombineXYZ(Node, AnimGraphNodeMixin):
+class CombineXYZ(AnimGraphNodeMixin):
     bl_idname = "CombineXYZ"
     bl_label = "Combine XYZ"
     bl_icon = "EMPTY_AXIS"
@@ -30,7 +29,7 @@ class CombineXYZ(Node, AnimGraphNodeMixin):
         out = self.outputs.get("Vector")
         if out: out.default_value = (float(x), float(y), float(z))
 
-class SeparateXYZ(Node, AnimGraphNodeMixin):
+class SeparateXYZ(AnimGraphNodeMixin):
     bl_idname = "SeparateXYZ"
     bl_label = "Separate XYZ"
     bl_icon = "EMPTY_AXIS"
@@ -50,7 +49,7 @@ class SeparateXYZ(Node, AnimGraphNodeMixin):
         if oy: oy.default_value = float(v.y)
         if oz: oz.default_value = float(v.z)
 
-class ComposeMatrix(Node, AnimGraphNodeMixin):
+class ComposeMatrix(AnimGraphNodeMixin):
     bl_idname = "ComposeMatrix"
     bl_label = "Compose Matrix"
     bl_icon = "NODE_SOCKET_MATRIX"
@@ -76,7 +75,7 @@ class ComposeMatrix(Node, AnimGraphNodeMixin):
         if out:
             out.default_value = m
 
-class DecomposeMatrix(Node, AnimGraphNodeMixin):
+class DecomposeMatrix(AnimGraphNodeMixin):
     bl_idname = "DecomposeMatrix"
     bl_label = "Decompose Matrix"
     bl_icon = "NODE_SOCKET_MATRIX"

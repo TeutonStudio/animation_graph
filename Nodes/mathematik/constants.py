@@ -1,7 +1,6 @@
 # animation_graph/Nodes/mathematik/constants.py
 
 import bpy
-from bpy.types import Node
 
 from ..Mixin import AnimGraphNodeMixin
 
@@ -12,7 +11,7 @@ def unregister():
     for c in reversed(_CONSTANTS): bpy.utils.unregister_class(c)
 
 
-class IntConst(Node, AnimGraphNodeMixin):
+class IntConst(AnimGraphNodeMixin):
     bl_idname = "IntConst"
     bl_label = "Constant (Int)"
     bl_icon = "NODE_SOCKET_INT"
@@ -22,7 +21,7 @@ class IntConst(Node, AnimGraphNodeMixin):
     
     def evaluate(self, tree, scene, ctx): pass
 
-class FloatConst(Node, AnimGraphNodeMixin):
+class FloatConst(AnimGraphNodeMixin):
     bl_idname = "FloatConst"
     bl_label = "Constant (Float)"
     bl_icon = "NODE_SOCKET_FLOAT"
@@ -32,7 +31,7 @@ class FloatConst(Node, AnimGraphNodeMixin):
     
     def evaluate(self, tree, scene, ctx): pass
 
-class VectorConst(Node, AnimGraphNodeMixin):
+class VectorConst(AnimGraphNodeMixin):
     bl_idname = "VectorConst"
     bl_label = "Constant (Vector)"
     bl_icon = "EMPTY_AXIS"
@@ -42,7 +41,7 @@ class VectorConst(Node, AnimGraphNodeMixin):
     
     def evaluate(self, tree, scene, ctx): pass
 
-class RotationConst(Node, AnimGraphNodeMixin):
+class RotationConst(AnimGraphNodeMixin):
     bl_idname = "RotationConst"
     bl_label = "Constant (Rotation)"
     bl_icon = "EMPTY_AXIS"
@@ -52,7 +51,7 @@ class RotationConst(Node, AnimGraphNodeMixin):
     
     def evaluate(self, tree, scene, ctx): pass
 
-class TranslationConst(Node, AnimGraphNodeMixin):
+class TranslationConst(AnimGraphNodeMixin):
     bl_idname = "TranslationConst"
     bl_label = "Constant (Translation)"
     bl_icon = "EMPTY_AXIS"
@@ -62,7 +61,7 @@ class TranslationConst(Node, AnimGraphNodeMixin):
     
     def evaluate(self, tree, scene, ctx): pass
 
-class MatrixConst(Node, AnimGraphNodeMixin):
+class MatrixConst(AnimGraphNodeMixin):
     bl_idname = "MatrixConst"
     bl_label = "Constant (Matrix)"
     bl_icon = "NODE_SOCKET_MATRIX"

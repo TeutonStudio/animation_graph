@@ -3,7 +3,7 @@
 import bpy
 from mathutils import Vector, Matrix
 
-class AnimGraphNodeMixin:
+class AnimGraphNodeMixin(bpy.types.Node):
     """
     Evaluations-Mixin (single-link MVP, aber deterministisch):
     - Upstream Evaluation (einmal pro Frame)
@@ -12,8 +12,7 @@ class AnimGraphNodeMixin:
     """
 
     @classmethod
-    def poll(cls, ntree):
-        return hasattr(ntree, "nodes")
+    def poll(cls, node_tree): return hasattr(node_tree, "nodes")
 
     # -----------------------------
     # internal helpers

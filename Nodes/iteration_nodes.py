@@ -16,14 +16,14 @@ def unregister():
     for c in reversed(_CLASSES): bpy.utils.unregister_class(c)
 
 
-class AnimNodeRepeatInput(bpy.types.Node, AnimGraphNodeMixin):
+class AnimNodeRepeatInput(AnimGraphNodeMixin):
     bl_idname = "AnimNodeRepeatInput"
     bl_label = "Repeat Input"
     bl_icon = "DRIVER"
 
     @classmethod
-    def poll(cls, ntree):
-        return getattr(ntree, "bl_idname", None) == "AnimNodeTree"
+    def poll(cls, node_tree):
+        return getattr(node_tree, "bl_idname", None) == "AnimNodeTree"
 
     def init(self, context):
         initial = self.inputs.new("NodeSocketInt", "Initial")
@@ -55,14 +55,14 @@ class AnimNodeRepeatInput(bpy.types.Node, AnimGraphNodeMixin):
         self.set_output_value(ctx, "Index", 0)
 
 
-class AnimNodeRepeatOutput(bpy.types.Node, AnimGraphNodeMixin):
+class AnimNodeRepeatOutput(AnimGraphNodeMixin):
     bl_idname = "AnimNodeRepeatOutput"
     bl_label = "Repeat Output"
     bl_icon = "DRIVER"
 
     @classmethod
-    def poll(cls, ntree):
-        return getattr(ntree, "bl_idname", None) == "AnimNodeTree"
+    def poll(cls, node_tree):
+        return getattr(node_tree, "bl_idname", None) == "AnimNodeTree"
 
     def init(self, context):
         iterations = self.inputs.new("NodeSocketInt", "Iterations")

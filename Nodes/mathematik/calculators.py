@@ -2,7 +2,6 @@
 
 import bpy
 import math
-from bpy.types import Node
 from mathutils import Vector, Matrix, Euler
 from bpy.props import EnumProperty
 
@@ -49,7 +48,7 @@ matrix_operators = basic_operators | {
 }
 
 
-class IntMath(Node, AnimGraphNodeMixin):
+class IntMath(AnimGraphNodeMixin):
     bl_idname = "IntMath"
     bl_label = "Math (Int)"
     bl_icon = "NODE_SOCKET_INT"
@@ -72,6 +71,7 @@ class IntMath(Node, AnimGraphNodeMixin):
         self.outputs.new("NodeSocketInt", "Remainder")
 
     def draw_buttons(self, context, layout):
+        if not layout: return
         layout.prop(self, "operation", text="")
 
     def evaluate(self, tree, scene, ctx):
@@ -114,7 +114,7 @@ class IntMath(Node, AnimGraphNodeMixin):
             try: out_rem.default_value = int(rem)
             except Exception: out_rem.default_value = int(0)
 
-class FloatMath(Node, AnimGraphNodeMixin):
+class FloatMath(AnimGraphNodeMixin):
     bl_idname = "FloatMath"
     bl_label = "Math (Float)"
     bl_icon = "NODE_SOCKET_FLOAT"
@@ -136,6 +136,7 @@ class FloatMath(Node, AnimGraphNodeMixin):
         self.outputs.new("NodeSocketFloat", "Result")
 
     def draw_buttons(self, context, layout):
+        if not layout: return
         layout.prop(self, "operation", text="")
 
     def evaluate(self, tree, scene, ctx):
@@ -170,7 +171,7 @@ class FloatMath(Node, AnimGraphNodeMixin):
         out = self.outputs.get("Result")
         if out: out.default_value = float(r)
 
-class VectorMath(Node, AnimGraphNodeMixin):
+class VectorMath(AnimGraphNodeMixin):
     bl_idname = "VectorMath"
     bl_label = "Vector Math"
     bl_icon = "NODE_SOCKET_VECTOR"
@@ -189,6 +190,7 @@ class VectorMath(Node, AnimGraphNodeMixin):
         self.outputs.new("NodeSocketFloat", "Float")
 
     def draw_buttons(self, context, layout):
+        if not layout: return
         layout.prop(self, "operation", text="")
 
     def evaluate(self, tree, scene, ctx):
@@ -221,7 +223,7 @@ class VectorMath(Node, AnimGraphNodeMixin):
                 if out_f: out_f.default_value = float((A - B).length)
         except Exception: pass
 
-class MatrixMath(Node, AnimGraphNodeMixin):
+class MatrixMath(AnimGraphNodeMixin):
     bl_idname = "MatrixMath"
     bl_label = "Matrix Math"
     bl_icon = "NODE_SOCKET_MATRIX"
@@ -249,6 +251,7 @@ class MatrixMath(Node, AnimGraphNodeMixin):
         self.outputs.new("NodeSocketMatrix", "Result")
 
     def draw_buttons(self, context, layout):
+        if not layout: return
         layout.prop(self, "operation", text="")
 
     def evaluate(self, tree, scene, ctx):

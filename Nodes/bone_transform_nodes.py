@@ -1,7 +1,6 @@
 # animation_graph/Nodes/bone_transform_node.py
 
 import bpy
-from bpy.types import Node
 from bpy.props import EnumProperty
 from mathutils import Vector, Euler, Matrix, Quaternion
 
@@ -98,7 +97,7 @@ def _on_node_prop_update(self, context):
 # -----------------------------
 # nodes
 # -----------------------------
-class _BoneTransform(Node, AnimGraphNodeMixin):
+class _BoneTransform(AnimGraphNodeMixin):
     bl_icon = "CON_TRANSFORM"
 
     # NOTE: Blender property update callbacks must be functions, not methods-by-name.
@@ -146,6 +145,7 @@ class _BoneTransform(Node, AnimGraphNodeMixin):
         except Exception: pass
 
     def draw_buttons(self, context, layout):
+        if not layout: return
         col = layout.column(align=True)
         col.prop(self, "representation", text="")
         col.prop(self, "apply_mode", text="")

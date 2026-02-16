@@ -62,7 +62,11 @@ class ANIMGRAPH_PT_action_binding(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         obj = context.object
-        action = obj.animation_data.action
+        if not obj or not layout: return
+        anim_data = obj.animation_data
+        if not anim_data: return
+        action = anim_data.action
+        if not action: return
 
         layout.label(text=f"Action: {action.name}")
         layout.template_ID(action, "animgraph_tree", new="animgraph.new_action_tree")

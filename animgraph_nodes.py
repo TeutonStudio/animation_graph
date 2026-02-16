@@ -29,7 +29,7 @@ def unregister():
 
 class AnimGraphNodeCategory(NodeCategory):
     @classmethod
-    def poll(cls, context): return True
+    def poll(cls, context) -> bool: return True
 
 
 _NODE_CATS_ID = "ANIMGRAPH_NODE_CATEGORIES"

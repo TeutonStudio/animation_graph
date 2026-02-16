@@ -35,7 +35,7 @@ def _enum_bone_property_items(self, context):
     try: return self._property_items()
     except Exception: return [("", "(select bone first)", "Pick a linked/selected bone first.")]
 
-class _Bone(bpy.types.Node, AnimGraphNodeMixin):
+class _Bone(AnimGraphNodeMixin):
     bl_icon = "BONE_DATA"
 
 class DefineBoneNode(_Bone):
@@ -46,6 +46,7 @@ class DefineBoneNode(_Bone):
     def draw_buttons(self, context, layout): pass
 
 class _BoneProperty(_Bone):
+    _ARRAY_SOCKET_NAMES = ("Value X", "Value Y", "Value Z")
     property_name: EnumProperty(
         name="Property",
         description="Property on the selected/linked pose bone",
@@ -64,6 +65,17 @@ class _BoneProperty(_Bone):
             self._ensure_socket()
         finally: self._syncing = False
 
+    def _current_property_kind(self):
+        spec = self._selected_property_spec()
+        if spec is None: return None
+        return spec.get("kind")
+
+    def _current_property_value(self):
+        pbone, _ = self._pose_bone_ref()
+        if pbone is None: return None
+        spec = self._selected_property_spec()
+        return self._read_property_value(pbone, spec)
+
     def _ensure_property_selection(self):
         valid = [spec["id"] for spec in self._property_specs() if spec.get("id")]
         current = str(getattr(self, "property_name", "") or "")
@@ -76,13 +88,202 @@ class _BoneProperty(_Bone):
         try: self.property_name = new_value
         except Exception: pass
     
+    def _property_specs(self):
+        pbone, _ = self._pose_bone_ref()
+        if pbone is None:
+            return []
+
+        specs = []
+
+        try:
+            keys = list(pbone.keys())
+        except Exception:
+            keys = []
+
+        for key in keys:
+            key_str = str(key)
+            if key_str == "_RNA_UI":
+                continue
+            try:
+                value = pbone[key_str]
+            except Exception:
+                continue
+
+            kind = _property_kind_from_value(value)
+
+            specs.append(
+                {
+                    "id": f"POSE_IDP:{key_str}",
+                    "source": "POSE_IDP",
+                    "key": key_str,
+                    "kind": kind,
+                    "label": f"{key_str} ({kind.lower()}, pose custom)",
+                    "description": f"Pose bone custom property '{key_str}' ({kind.lower()})",
+                }
+            )
+
+        try:
+            data_bone = getattr(pbone, "bone", None)
+        except Exception:
+            data_bone = None
+
+        if data_bone is not None:
+            try:
+                data_keys = list(data_bone.keys())
+            except Exception:
+                data_keys = []
+
+            for key in data_keys:
+                key_str = str(key)
+                if key_str == "_RNA_UI": continue
+                try:
+                    value = data_bone[key_str]
+                except Exception: continue
+
+                kind = _property_kind_from_value(value)
+
+                specs.append( {
+                    "id": f"BONE_IDP:{key_str}",
+                    "source": "BONE_IDP",
+                    "key": key_str,
+                    "kind": kind,
+                    "label": f"{key_str} ({kind.lower()}, bone custom)",
+                    "description": f"Bone-data custom property '{key_str}' ({kind.lower()})",
+                } )
+
+        specs.sort(key=lambda spec: spec["label"].lower())
+        return specs
+
+    def _pose_bone_ref(self):
+        arm_ob, bone_name = self.socket_bone_ref("Bone")
+        if not arm_ob or getattr(arm_ob, "type", "") != "ARMATURE" or not bone_name:
+            return None, ""
+        pose = getattr(arm_ob, "pose", None)
+        if pose is None: return None, ""
+        return pose.bones.get(bone_name), bone_name
+
+    def _selected_property_spec(self):
+        selected = str(getattr(self, "property_name", "") or "").strip()
+        if not selected:
+            return None
+        for spec in self._property_specs():
+            if spec["id"] == selected:
+                return spec
+        return None
+
+    def _read_property_value(self, pbone, spec):
+        if pbone is None or not spec: return None
+        key = spec.get("key")
+        if not key: return None
+        source = spec.get("source")
+        if source == "BONE_IDP":
+            try:
+                data_bone = getattr(pbone, "bone", None)
+                if data_bone is None: return None
+                return data_bone[key]
+            except Exception: return None
+        try:
+            return pbone[key]
+        except Exception: return None
+
+    def _coerce_for_kind(self, value, kind, fallback):
+        if kind == "BOOL":
+            return _coerce_bool(value, fallback)
+        if kind == "INT":
+            return _coerce_int(value, fallback)
+        if kind == "FLOAT":
+            return _coerce_float(value, fallback)
+        if kind == "STRING":
+            return _coerce_string(value, fallback)
+        if str(kind).endswith("_ARRAY"):
+            fb = self._array_defaults(kind, fallback)
+            candidate = _parse_json_text(value, fallback=value)
+            seq = _to_sequence(candidate)
+            if seq is None:
+                seq = fb
+
+            out = []
+            base = str(kind).removesuffix("_ARRAY")
+            for idx in range(3):
+                raw = seq[idx] if idx < len(seq) else fb[idx]
+                if base == "BOOL":
+                    out.append(_coerce_bool(raw, fb[idx]))
+                elif base == "INT":
+                    out.append(_coerce_int(raw, fb[idx]))
+                else:
+                    out.append(_coerce_float(raw, fb[idx]))
+            return out
+        if kind == "DATA_BLOCK":
+            return _coerce_data_block(value, fallback)
+        if kind == "PYTHON":
+            return _clone_value(value if value is not None else fallback)
+        return fallback
+
+    def _array_defaults(self, kind, value):
+        sock_type = self._array_socket_type_for_property(kind, value)
+        use_int = sock_type == sockets._S("INT")
+        use_bool = sock_type == sockets._S("BOOL")
+
+        seq = list(_to_sequence(value) or [])
+
+        out = []
+        for idx in range(3):
+            raw = seq[idx] if idx < len(seq) else (False if use_bool else (0 if use_int else 0.0))
+            if use_bool:
+                out.append(_coerce_bool(raw, False))
+            elif use_int:
+                out.append(_coerce_int(raw, 0))
+            else:
+                out.append(_coerce_float(raw, 0.0))
+        return out
+
+    def _array_socket_type_for_property(self, kind, value):
+        kind = str(kind or "")
+        if kind.endswith("_ARRAY"):
+            base = kind.removesuffix("_ARRAY")
+            if base == "BOOL":
+                return sockets._S("BOOL")
+            if base == "INT":
+                return sockets._S("INT")
+            if base == "FLOAT":
+                return sockets._S("FLOAT")
+        return None
+
+    def _uses_array_value_sockets(self, kind, value=None):
+        kind = str(kind or "")
+        return kind in {"BOOL_ARRAY", "INT_ARRAY", "FLOAT_ARRAY"}
+
+    def _value_as_socket_payload(self, kind, value):
+        if kind == "BOOL":
+            return bool(_coerce_bool(value, False))
+        if kind == "INT":
+            return int(_coerce_int(value, 0))
+        if kind == "FLOAT":
+            return float(_coerce_float(value, 0.0))
+        if kind == "STRING":
+            return _coerce_string(value, "")
+        if kind == "DATA_BLOCK":
+            return _data_block_to_text(value)
+        if kind == "PYTHON":
+            return _json_text(value, "")
+        return value
+
+    def _set_socket_default_for_kind(self, sock, kind, value):
+        if sock is None or not hasattr(sock, "default_value"):
+            return
+        try:
+            sock.default_value = self._value_as_socket_payload(kind, value)
+        except Exception:
+            pass
+
     def _ensure_socket(self): pass
-    def draw_buttons(self, context, layout): layout.prop(self, "property_name")
+    def draw_buttons(self, context, layout): 
+        if not layout: return
+        layout.prop(self, "property_name")
 
 class DefineBonePropertyNode(_BoneProperty):
     bl_idname = "DefineBonePropertyNode"
     bl_label = "Bone Property"
-    _ARRAY_SOCKET_NAMES = ("Value X", "Value Y", "Value Z")
 
     def init(self, context):
         super().init(context)
@@ -221,54 +422,12 @@ class DefineBonePropertyNode(_BoneProperty):
 
     def _ensure_socket(self): self._ensure_value_socket()
 
-    def _pose_bone_ref(self):
-        arm_ob, bone_name = self.socket_bone_ref("Bone")
-        if not arm_ob or getattr(arm_ob, "type", "") != "ARMATURE" or not bone_name:
-            return None, ""
-        pose = getattr(arm_ob, "pose", None)
-        if pose is None: return None, ""
-        return pose.bones.get(bone_name), bone_name
-
     def _runtime_state_cache(self):
         cache = getattr(self, "_runtime_property_state", None)
         if not isinstance(cache, dict):
             cache = {}
             self._runtime_property_state = cache
         return cache
-
-    def _uses_array_value_sockets(self, kind, value=None):
-        kind = str(kind or "")
-        return kind in {"BOOL_ARRAY", "INT_ARRAY", "FLOAT_ARRAY"}
-
-    def _array_socket_type_for_property(self, kind, value):
-        kind = str(kind or "")
-        if kind.endswith("_ARRAY"):
-            base = kind.removesuffix("_ARRAY")
-            if base == "BOOL":
-                return sockets._S("BOOL")
-            if base == "INT":
-                return sockets._S("INT")
-            if base == "FLOAT":
-                return sockets._S("FLOAT")
-        return None
-
-    def _array_defaults(self, kind, value):
-        sock_type = self._array_socket_type_for_property(kind, value)
-        use_int = sock_type == sockets._S("INT")
-        use_bool = sock_type == sockets._S("BOOL")
-
-        seq = list(_to_sequence(value) or [])
-
-        out = []
-        for idx in range(3):
-            raw = seq[idx] if idx < len(seq) else (False if use_bool else (0 if use_int else 0.0))
-            if use_bool:
-                out.append(_coerce_bool(raw, False))
-            elif use_int:
-                out.append(_coerce_int(raw, 0))
-            else:
-                out.append(_coerce_float(raw, 0.0))
-        return out
 
     def _array_target_from_sockets(self, tree, scene, ctx, kind, fallback):
         defaults = self._array_defaults(kind, fallback)
@@ -297,96 +456,6 @@ class DefineBonePropertyNode(_BoneProperty):
             return [("", "(no custom properties)", "No custom properties found on this bone.")]
         return [(spec["id"], spec["label"], spec["description"]) for spec in specs]
 
-    def _property_specs(self):
-        pbone, _ = self._pose_bone_ref()
-        if pbone is None:
-            return []
-
-        specs = []
-
-        try:
-            keys = list(pbone.keys())
-        except Exception:
-            keys = []
-
-        for key in keys:
-            key_str = str(key)
-            if key_str == "_RNA_UI":
-                continue
-            try:
-                value = pbone[key_str]
-            except Exception:
-                continue
-
-            kind = _property_kind_from_value(value)
-
-            specs.append(
-                {
-                    "id": f"POSE_IDP:{key_str}",
-                    "source": "POSE_IDP",
-                    "key": key_str,
-                    "kind": kind,
-                    "label": f"{key_str} ({kind.lower()}, pose custom)",
-                    "description": f"Pose bone custom property '{key_str}' ({kind.lower()})",
-                }
-            )
-
-        try:
-            data_bone = getattr(pbone, "bone", None)
-        except Exception:
-            data_bone = None
-
-        if data_bone is not None:
-            try:
-                data_keys = list(data_bone.keys())
-            except Exception:
-                data_keys = []
-
-            for key in data_keys:
-                key_str = str(key)
-                if key_str == "_RNA_UI": continue
-                try:
-                    value = data_bone[key_str]
-                except Exception: continue
-
-                kind = _property_kind_from_value(value)
-
-                specs.append( {
-                    "id": f"BONE_IDP:{key_str}",
-                    "source": "BONE_IDP",
-                    "key": key_str,
-                    "kind": kind,
-                    "label": f"{key_str} ({kind.lower()}, bone custom)",
-                    "description": f"Bone-data custom property '{key_str}' ({kind.lower()})",
-                } )
-
-        specs.sort(key=lambda spec: spec["label"].lower())
-        return specs
-
-    def _selected_property_spec(self):
-        selected = str(getattr(self, "property_name", "") or "").strip()
-        if not selected:
-            return None
-        for spec in self._property_specs():
-            if spec["id"] == selected:
-                return spec
-        return None
-
-    def _read_property_value(self, pbone, spec):
-        if pbone is None or not spec: return None
-        key = spec.get("key")
-        if not key: return None
-        source = spec.get("source")
-        if source == "BONE_IDP":
-            try:
-                data_bone = getattr(pbone, "bone", None)
-                if data_bone is None: return None
-                return data_bone[key]
-            except Exception: return None
-        try:
-            return pbone[key]
-        except Exception: return None
-
     def _write_property_value(self, pbone, spec, value):
         if pbone is None or not spec:  return False
         key = spec.get("key")
@@ -399,50 +468,6 @@ class DefineBonePropertyNode(_BoneProperty):
             else: pbone[key] = value
             return True
         except Exception: return False
-
-    def _current_property_kind(self):
-        spec = self._selected_property_spec()
-        if spec is None: return None
-        return spec.get("kind")
-
-    def _current_property_value(self):
-        pbone, _ = self._pose_bone_ref()
-        if pbone is None: return None
-        spec = self._selected_property_spec()
-        return self._read_property_value(pbone, spec)
-
-    def _coerce_for_kind(self, value, kind, fallback):
-        if kind == "BOOL":
-            return _coerce_bool(value, fallback)
-        if kind == "INT":
-            return _coerce_int(value, fallback)
-        if kind == "FLOAT":
-            return _coerce_float(value, fallback)
-        if kind == "STRING":
-            return _coerce_string(value, fallback)
-        if str(kind).endswith("_ARRAY"):
-            fb = self._array_defaults(kind, fallback)
-            candidate = _parse_json_text(value, fallback=value)
-            seq = _to_sequence(candidate)
-            if seq is None:
-                seq = fb
-
-            out = []
-            base = str(kind).removesuffix("_ARRAY")
-            for idx in range(3):
-                raw = seq[idx] if idx < len(seq) else fb[idx]
-                if base == "BOOL":
-                    out.append(_coerce_bool(raw, fb[idx]))
-                elif base == "INT":
-                    out.append(_coerce_int(raw, fb[idx]))
-                else:
-                    out.append(_coerce_float(raw, fb[idx]))
-            return out
-        if kind == "DATA_BLOCK":
-            return _coerce_data_block(value, fallback)
-        if kind == "PYTHON":
-            return _clone_value(value if value is not None else fallback)
-        return fallback
 
     def _ensure_value_socket(self):
         kind = self._current_property_kind()
@@ -499,29 +524,6 @@ class DefineBonePropertyNode(_BoneProperty):
         if current_socket is None:
             current_socket = self.inputs.new(wanted[0][1], "Value")
             self._set_socket_default_for_kind(current_socket, kind, prop_value)
-
-    def _value_as_socket_payload(self, kind, value):
-        if kind == "BOOL":
-            return bool(_coerce_bool(value, False))
-        if kind == "INT":
-            return int(_coerce_int(value, 0))
-        if kind == "FLOAT":
-            return float(_coerce_float(value, 0.0))
-        if kind == "STRING":
-            return _coerce_string(value, "")
-        if kind == "DATA_BLOCK":
-            return _data_block_to_text(value)
-        if kind == "PYTHON":
-            return _json_text(value, "")
-        return value
-
-    def _set_socket_default_for_kind(self, sock, kind, value):
-        if sock is None or not hasattr(sock, "default_value"):
-            return
-        try:
-            sock.default_value = self._value_as_socket_payload(kind, value)
-        except Exception:
-            pass
 
 class ReadBonePropertyNode(_BoneProperty):
     bl_idname = "ReadBonePropertyNode"
@@ -885,7 +887,9 @@ def _data_block_to_text(value):
         return ""
     try:
         if isinstance(value, bpy.types.ID):
-            type_name = str(getattr(value, "bl_rna", None).name if getattr(value, "bl_rna", None) else "ID")
+            rna = getattr(value, "bl_rna", None)
+            if not rna: return
+            type_name = str(rna.name if getattr(value, "bl_rna", None) else "ID")
             return f"{type_name}:{getattr(value, 'name_full', getattr(value, 'name', ''))}"
     except Exception:
         pass
