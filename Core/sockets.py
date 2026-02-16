@@ -21,6 +21,8 @@ def _enum_bones_from_selected_armature(self, context):
         return [("", "(keine Bones vorhanden)", "Die gewählte Armature hat keine Bones.")]
     return items
 
+def _on_armature_poll(self,obj): return obj is not None and obj.type == "ARMATURE"
+
 def _on_armature_changed(self, context):
     """
     Wenn Armature wechselt: Bone-Auswahl zurücksetzen, falls nicht mehr gültig.
@@ -44,7 +46,7 @@ class NodeSocketBone(bpy.types.NodeSocket):
         name="Armature",
         description="Armature-Objekt aus der aktuellen Datei",
         type=bpy.types.Object,
-        poll=lambda self, obj: obj is not None and obj.type == "ARMATURE",
+        poll=_on_armature_poll, # lambda self, obj: obj is not None and obj.type == "ARMATURE",
         update=_on_armature_changed,
     )
 

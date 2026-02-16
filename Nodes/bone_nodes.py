@@ -277,6 +277,16 @@ class _BoneProperty(_Bone):
             pass
 
     def _ensure_socket(self): pass
+    def _property_items(self):
+        pbone, _ = self._pose_bone_ref()
+        if pbone is None:
+            return [("", "(select bone first)", "Pick a linked/selected bone first.")]
+
+        specs = self._property_specs()
+        if not specs:
+            return [("", "(no custom properties)", "No custom properties found on this bone.")]
+        return [(spec["id"], spec["label"], spec["description"]) for spec in specs]
+
     def draw_buttons(self, context, layout): 
         if not layout: return
         layout.prop(self, "property_name")
@@ -445,16 +455,6 @@ class DefineBonePropertyNode(_BoneProperty):
             else:
                 out.append(_coerce_float(raw_value, defaults[idx]))
         return out
-
-    def _property_items(self):
-        pbone, _ = self._pose_bone_ref()
-        if pbone is None:
-            return [("", "(select bone first)", "Pick a linked/selected bone first.")]
-
-        specs = self._property_specs()
-        if not specs:
-            return [("", "(no custom properties)", "No custom properties found on this bone.")]
-        return [(spec["id"], spec["label"], spec["description"]) for spec in specs]
 
     def _write_property_value(self, pbone, spec, value):
         if pbone is None or not spec:  return False

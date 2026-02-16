@@ -1,10 +1,11 @@
 # animation_graph/Core/helper_methoden.py
 
-from mathutils import Quaternion
-from types import SimpleNamespace
+import typing
 import re
 import bpy
 
+from mathutils import Quaternion
+from types import SimpleNamespace
 from . import sockets
 
 _TIMEKEY_CHANNEL_PATH = '["animgraph_time"]'
@@ -567,7 +568,7 @@ def _extract_timekey_entry_from_mapping(data_items):
     if frame is None:
         return None
 
-    entry = {"frame": int(frame)}
+    entry: dict[str,typing.Any] = {"frame": int(frame)}
 
     for key in ("bone", "bone_name", "bonename", "bone_ref", "boneref", "boneid", "target_bone", "targetbone", "target"):
         if key in lower:
@@ -1184,8 +1185,8 @@ def _import_tree_from_action_timekeys(action, tree, context=None):
 
     time_frames = _collect_action_time_frames(action, context=context)
     timekey_entries = _collect_timekey_entries_from_action_properties(action)
-    entry_tracks = _group_timekey_entries_by_bone(timekey_entries)
-    bones = _collect_bone_fcurves(action, context=context)
+    entry_tracks: dict[str,typing.Any] = _group_timekey_entries_by_bone(timekey_entries)
+    bones: dict[str,typing.Any] = _collect_bone_fcurves(action, context=context)
     if not bones and not time_frames and not entry_tracks:
         return
 
@@ -1203,24 +1204,25 @@ def _import_tree_from_action_timekeys(action, tree, context=None):
     use_global_time_frames = not bool(entry_tracks)
 
     for bone_name in sorted(all_bones):
-        data = bones.get(bone_name)
-        if data is None:
-            data = _empty_transform_channels()
-            data["frames"] = set()
+        if bone_name in bones:
+            data: dict[str,typing.Any] = bones.get(bone_name)
+            if data is None:
+                data = _empty_transform_channels()
+                data["frames"] = set()
 
-        entry_meta = entry_tracks.get(bone_name)
-        frames = set(int(f) for f in data.get("frames", []))
+            entry_meta = entry_tracks.get(bone_name)
+            frames = set(int(f) for f in data.get("frames", []))
 
-        if entry_meta is not None:
-            frames |= set(int(f) for f in entry_meta.get("frames", []))
-        elif use_global_time_frames and time_frames:
-            frames |= set(int(f) for f in time_frames)
+            if entry_meta is not None:
+                frames |= set(int(f) for f in entry_meta.get("frames", []))
+            elif use_global_time_frames and time_frames:
+                frames |= set(int(f) for f in time_frames)
 
-        frames = sorted(frames)
-        if not frames:
-            continue
+            frames = sorted(frames)
+            if not frames:
+                continue
 
-        tracks.append((bone_name, data, frames, entry_meta))
+            tracks.append((bone_name, data, frames, entry_meta))
 
     for row_idx, (bone_name, data, frames, entry_meta) in enumerate(tracks):
         if not frames:
