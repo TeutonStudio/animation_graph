@@ -19,7 +19,7 @@ Es verknüpft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 - Bone Transform schreiben/lesen (Components oder Matrix, inklusive Delta-Modus).
 - Bone Property schreiben/lesen (Bool, Int, Float, Vector, Matrix, String, JSON).
 - Math-/Adapter-Nodes für Zahlen, Vektoren und Matrizen.
-- Group-Node mit Subtree-Interface-Sync.
+- Group-Node mit Subtree-Interface-Sync und Editor-Navigation über `space.path`.
 - Timekey-Sync zwischen Tree und Action (`animgraph_time`, inkl. Legacy-Keys `timeKeys`/`time_keys`).
 
 ## Installation
@@ -64,11 +64,16 @@ Es verknüpft eine `Action` mit einem `AnimNodeTree`, wertet diesen pro Frame au
 - `Core/action_editor.py`: PropertyGroup für Action-Input-Werte.
 - `Nodes/`: Bone-, Transform-, Math-, Group- und Iteration-Nodes.
 - `UI/action_operator.py`: Dopesheet-Panel und Tree-Erstellung.
-- `UI/group_operator.py`: Group-Enter-Operator.
+- `UI/group_operator.py`: Group-Navigation, Exit-/Jump-Operatoren und Breadcrumb-Fallback im Node Editor.
+
+## Group-Navigation
+
+- `AnimNodeGroup` nutzt `animgraph.enter_group`, um per `space.path` in Subtrees zu navigieren.
+- `animgraph.exit_group` geht eine Ebene nach oben, solange die Pfadtiefe groesser als 1 ist.
+- Fuer `AnimNodeTree` rendert Blender 5.0.0 native Breadcrumbs nicht zuverlaessig; das Add-on zeigt deshalb im Node Editor ein eigenes Breadcrumb-Fallback mit direktem Sprung auf Zwischenebenen.
 
 ## Aktuelle Einschränkungen
 
 - Armature-only Design (kein allgemeiner Object-Graph).
 - Single-Link-Auswertung pro Input (erster Link wird gelesen).
 - `AnimNodeRepeatInput`/`AnimNodeRepeatOutput` sind implementiert, aber nicht in den Node-Kategorien eingetragen.
-- Ein `Exit Group`-Operator existiert im Code, ist aktuell nicht registriert.
